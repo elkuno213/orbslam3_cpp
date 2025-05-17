@@ -30,6 +30,7 @@
 #include <opencv2/core.hpp>
 #include <sophus/se3.hpp>
 #include <spdlog/logger.h>
+#include "Common/Common.h"
 #include "Frame.h"
 #include "ImuTypes.h"
 #include "ORBVocabulary.h"
@@ -60,7 +61,7 @@ public:
     Atlas*             pAtlas,
     KeyFrameDatabase*  pKFDB,
     const std::string& strSettingPath,
-    const int          sensor,
+    Sensor             sensor,
     Settings*          settings,
     const std::string& _nameSeq = std::string()
   );
@@ -144,7 +145,7 @@ public:
   eTrackingState mLastProcessedState;
 
   // Input sensor
-  int mSensor;
+  Sensor mSensor;
 
   // Current Frame
   Frame mCurrentFrame;

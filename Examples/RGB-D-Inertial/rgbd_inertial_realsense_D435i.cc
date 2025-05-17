@@ -286,7 +286,7 @@ int main(int argc, char** argv) {
 
     // Create SLAM system. It initializes all system threads and gets ready to process frames.
     ORB_SLAM3::System
-          SLAM(vocabulary_file, settings_file, ORB_SLAM3::System::IMU_RGBD, true, 0, output_dir);
+      SLAM(vocabulary_file, settings_file, ORB_SLAM3::Sensor::InertialRGBD, true, 0, output_dir);
     float imageScale = SLAM.GetImageScale();
 
     double  timestamp;

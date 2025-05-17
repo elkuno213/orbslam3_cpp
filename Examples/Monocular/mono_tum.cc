@@ -73,7 +73,7 @@ int main(int argc, char** argv) {
     int nImages = vstrImageFilenames.size();
 
     // Create SLAM system. It initializes all system threads and gets ready to process frames.
-    ORB_SLAM3::System SLAM(vocabulary_file, settings_file, ORB_SLAM3::System::MONOCULAR, true);
+    ORB_SLAM3::System SLAM(vocabulary_file, settings_file, ORB_SLAM3::Sensor::Monocular, true);
     float             imageScale = SLAM.GetImageScale();
 
     // Vector for tracking time statistics

@@ -144,7 +144,7 @@ TEST_F(TrackingTest, ConstructorNonExistentFile) {
         nullptr,
         nullptr,
         "nonexistent.yaml",
-        System::MONOCULAR,
+        Sensor::Monocular,
         nullptr
       );
     },
@@ -164,7 +164,7 @@ TEST_F(TrackingTest, ConstructorInvalidFile) {
         nullptr,
         nullptr,
         kSettingsFile,
-        System::MONOCULAR,
+        Sensor::Monocular,
         nullptr
       );
     },

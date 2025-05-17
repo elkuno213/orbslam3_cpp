@@ -135,8 +135,9 @@ int main(int argc, char** argv) {
     vTimesTrack.resize(tot_images);
 
     // Create SLAM system. It initializes all system threads and gets ready to process frames.
-    ORB_SLAM3::System SLAM(vocabulary_file, settings_file, ORB_SLAM3::System::IMU_MONOCULAR, true);
-    float             imageScale = SLAM.GetImageScale();
+    ORB_SLAM3::System
+          SLAM(vocabulary_file, settings_file, ORB_SLAM3::Sensor::InertialMonocular, true);
+    float imageScale = SLAM.GetImageScale();
 
     double t_resize = 0.f;
     double t_track  = 0.f;

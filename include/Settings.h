@@ -29,6 +29,7 @@
 #include <opencv2/core.hpp>
 #include <sophus/se3.hpp>
 #include <spdlog/logger.h>
+#include "Common/Common.h"
 
 namespace ORB_SLAM3 {
 
@@ -55,7 +56,7 @@ public:
   /*
    * Constructor from file
    */
-  Settings(const std::string& configFile, const int& sensor);
+  Settings(const std::string& configFile, Sensor sensor);
 
   /*
    * Return string of settings
@@ -247,7 +248,7 @@ private:
 
   void precomputeRectificationMaps();
 
-  int        sensor_;
+  Sensor     sensor_;
   CameraType cameraType_; // Camera type
 
   /*

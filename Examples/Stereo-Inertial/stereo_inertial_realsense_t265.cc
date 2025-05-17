@@ -75,7 +75,7 @@ int main(int argc, char** argv) {
 
   try {
     ORB_SLAM3::System
-          SLAM(vocabulary_file, settings_file, ORB_SLAM3::System::IMU_STEREO, true, 0, output_dir);
+      SLAM(vocabulary_file, settings_file, ORB_SLAM3::Sensor::InertialStereo, true, 0, output_dir);
     float imageScale = SLAM.GetImageScale();
 
     struct sigaction sigIntHandler;

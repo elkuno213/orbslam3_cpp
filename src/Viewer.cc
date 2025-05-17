@@ -204,7 +204,7 @@ void Viewer::Run() {
   bool bStepByStep       = false;
   bool bCameraView       = true;
 
-  if(mpTracker->mSensor == mpSystem->MONOCULAR || mpTracker->mSensor == mpSystem->STEREO || mpTracker->mSensor == mpSystem->RGBD) {
+  if (mpTracker->mSensor == Sensor::Monocular || mpTracker->mSensor == Sensor::Stereo || mpTracker->mSensor == Sensor::RGBD) {
     menuShowGraph = true;
   }
 

@@ -189,12 +189,12 @@ protected:
 };
 
 TEST_F(SettingsTest, ConstructorNonExistentFile) {
-  ASSERT_THROW({ Settings s("nonexistent.yaml", System::MONOCULAR); }, std::runtime_error);
+  ASSERT_THROW({ Settings s("nonexistent.yaml", Sensor::Monocular); }, std::runtime_error);
 }
 
 TEST_F(SettingsTest, ConstructorInvalidFile) {
   CreateInvalidConfig();
-  ASSERT_THROW({ Settings s(kSettingsFile, System::MONOCULAR); }, std::runtime_error);
+  ASSERT_THROW({ Settings s(kSettingsFile, Sensor::Monocular); }, std::runtime_error);
 }
 
 TEST_F(SettingsTest, ConstructorValidFile) {
@@ -202,12 +202,12 @@ TEST_F(SettingsTest, ConstructorValidFile) {
   for (const auto& model : camera_models) {
     CreateValidConfig(model);
     // clang-format off
-    ASSERT_NO_THROW({ Settings s(kSettingsFile, System::STEREO       ); });
-    ASSERT_NO_THROW({ Settings s(kSettingsFile, System::IMU_STEREO   ); });
-    ASSERT_NO_THROW({ Settings s(kSettingsFile, System::MONOCULAR    ); });
-    ASSERT_NO_THROW({ Settings s(kSettingsFile, System::IMU_MONOCULAR); });
-    ASSERT_NO_THROW({ Settings s(kSettingsFile, System::RGBD         ); });
-    ASSERT_NO_THROW({ Settings s(kSettingsFile, System::IMU_RGBD     ); });
+    ASSERT_NO_THROW({ Settings s(kSettingsFile, Sensor::Stereo           ); });
+    ASSERT_NO_THROW({ Settings s(kSettingsFile, Sensor::InertialStereo   ); });
+    ASSERT_NO_THROW({ Settings s(kSettingsFile, Sensor::Monocular        ); });
+    ASSERT_NO_THROW({ Settings s(kSettingsFile, Sensor::InertialMonocular); });
+    ASSERT_NO_THROW({ Settings s(kSettingsFile, Sensor::RGBD             ); });
+    ASSERT_NO_THROW({ Settings s(kSettingsFile, Sensor::InertialRGBD     ); });
     // clang-format on
   }
 }

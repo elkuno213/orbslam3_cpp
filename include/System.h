@@ -29,6 +29,7 @@
 #include <opencv2/core.hpp>
 #include <sophus/se3.hpp>
 #include <spdlog/spdlog.h>
+#include "Common/Common.h"
 #include "ImuTypes.h"
 #include "ORBVocabulary.h"
 
@@ -48,16 +49,6 @@ class Viewer;
 
 class System {
 public:
-  // Input sensor
-  enum eSensor {
-    MONOCULAR     = 0,
-    STEREO        = 1,
-    RGBD          = 2,
-    IMU_MONOCULAR = 3,
-    IMU_STEREO    = 4,
-    IMU_RGBD      = 5,
-  };
-
   // File type
   enum FileType {
     TEXT_FILE   = 0,
@@ -70,7 +61,7 @@ public:
   System(
     const std::string& strVocFile,
     const std::string& strSettingsFile,
-    const eSensor      sensor,
+    const Sensor       sensor,
     const bool         bUseViewer  = true,
     const int          initFr      = 0,
     const std::string& strSequence = std::string()
@@ -187,7 +178,7 @@ private:
   std::string CalculateCheckSum(std::string filename, int type);
 
   // Input sensor
-  eSensor mSensor;
+  Sensor mSensor;
 
   // ORB vocabulary used for place recognition and feature matching.
   ORBVocabulary* mpVocabulary;

@@ -73,8 +73,14 @@ int main(int argc, char** argv) {
 
   // Run.
   try {
-    ORB_SLAM3::System
-      SLAM(vocabulary_file, settings_file, ORB_SLAM3::System::IMU_MONOCULAR, true, 0, output_dir);
+    ORB_SLAM3::System SLAM(
+      vocabulary_file,
+      settings_file,
+      ORB_SLAM3::Sensor::InertialMonocular,
+      true,
+      0,
+      output_dir
+    );
     float imageScale = SLAM.GetImageScale();
 
     struct sigaction sigIntHandler;

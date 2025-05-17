@@ -75,7 +75,7 @@ int main(int argc, char** argv) {
   std::cout << "IMU data in the sequence: " << nImu << std::endl << std::endl;*/
 
   // Create SLAM system. It initializes all system threads and gets ready to process frames.
-  ORB_SLAM3::System SLAM(argv[1], argv[2], ORB_SLAM3::System::STEREO, true, 0, file_name);
+  ORB_SLAM3::System SLAM(argv[1], argv[2], ORB_SLAM3::Sensor::Stereo, true, 0, file_name);
   float             imageScale = SLAM.GetImageScale();
 
   cv::Mat                            imLeft, imRight;

@@ -112,7 +112,7 @@ cv::Mat Settings::readParameter<cv::Mat>(
   }
 }
 
-Settings::Settings(const std::string& configFile, const int& sensor)
+Settings::Settings(const std::string& configFile, Sensor sensor)
   : bNeedToUndistort_(false)
   , bNeedToRectify_(false)
   , bNeedToResize1_(false)
@@ -133,7 +133,7 @@ Settings::Settings(const std::string& configFile, const int& sensor)
   _logger->info("Camera 1 loaded");
 
   // Read second camera if stereo (not rectified)
-  if (sensor_ == System::STEREO || sensor_ == System::IMU_STEREO) {
+  if (sensor_ == Sensor::Stereo || sensor_ == Sensor::InertialStereo) {
     readCamera2(fSettings);
     _logger->info("Camera 2 loaded");
   }
@@ -142,12 +142,12 @@ Settings::Settings(const std::string& configFile, const int& sensor)
   readImageInfo(fSettings);
   _logger->info("Camera info loaded");
 
-  if (sensor_ == System::IMU_MONOCULAR || sensor_ == System::IMU_STEREO || sensor_ == System::IMU_RGBD) {
+  if (sensor_ == Sensor::InertialMonocular || sensor_ == Sensor::InertialStereo || sensor_ == Sensor::InertialRGBD) {
     readIMU(fSettings);
     _logger->info("IMU calibration loaded");
   }
 
-  if (sensor_ == System::RGBD || sensor_ == System::IMU_RGBD) {
+  if (sensor_ == Sensor::RGBD || sensor_ == Sensor::InertialRGBD) {
     readRGBD(fSettings);
     _logger->info("RGB-D calibration loaded");
   }
@@ -205,7 +205,7 @@ void Settings::readCamera1(cv::FileStorage& fSettings) {
     }
 
     // Check if we need to correct distortion from the images
-    if ((sensor_ == System::MONOCULAR || sensor_ == System::IMU_MONOCULAR) && vPinHoleDistorsion1_.size() != 0) {
+    if ((sensor_ == Sensor::Monocular || sensor_ == Sensor::InertialMonocular) && vPinHoleDistorsion1_.size() != 0) {
       bNeedToUndistort_ = true;
     }
   } else if (cameraModel == "Rectified") {
@@ -242,7 +242,7 @@ void Settings::readCamera1(cv::FileStorage& fSettings) {
     calibration1_   = new KannalaBrandt8(vCalibration);
     originalCalib1_ = new KannalaBrandt8(vCalibration);
 
-    if (sensor_ == System::STEREO || sensor_ == System::IMU_STEREO) {
+    if (sensor_ == Sensor::Stereo || sensor_ == Sensor::InertialStereo) {
       int              colBegin = readParameter<int>(fSettings, "Camera1.overlappingBegin", found);
       int              colEnd   = readParameter<int>(fSettings, "Camera1.overlappingEnd", found);
       std::vector<int> vOverlapping = {colBegin, colEnd};
@@ -347,7 +347,7 @@ void Settings::readImageInfo(cv::FileStorage& fSettings) {
       calibration1_->setParameter(calibration1_->getParameter(1) * scaleRowFactor, 1);
       calibration1_->setParameter(calibration1_->getParameter(3) * scaleRowFactor, 3);
 
-      if ((sensor_ == System::STEREO || sensor_ == System::IMU_STEREO) && cameraType_ != Rectified) {
+      if ((sensor_ == Sensor::Stereo || sensor_ == Sensor::InertialStereo) && cameraType_ != Rectified) {
         calibration2_->setParameter(calibration2_->getParameter(1) * scaleRowFactor, 1);
         calibration2_->setParameter(calibration2_->getParameter(3) * scaleRowFactor, 3);
       }
@@ -365,7 +365,7 @@ void Settings::readImageInfo(cv::FileStorage& fSettings) {
       calibration1_->setParameter(calibration1_->getParameter(0) * scaleColFactor, 0);
       calibration1_->setParameter(calibration1_->getParameter(2) * scaleColFactor, 2);
 
-      if ((sensor_ == System::STEREO || sensor_ == System::IMU_STEREO) && cameraType_ != Rectified) {
+      if ((sensor_ == Sensor::Stereo || sensor_ == Sensor::InertialStereo) && cameraType_ != Rectified) {
         calibration2_->setParameter(calibration2_->getParameter(0) * scaleColFactor, 0);
         calibration2_->setParameter(calibration2_->getParameter(2) * scaleColFactor, 2);
 
@@ -520,7 +520,7 @@ void Settings::precomputeRectificationMaps() {
   bf_ = b_ * P1.at<double>(0, 0);
 
   // Update relative pose between camera 1 and IMU if necessary
-  if (sensor_ == System::IMU_STEREO) {
+  if (sensor_ == Sensor::InertialStereo) {
     Eigen::Matrix3f eigenR_r1_u1;
     cv::cv2eigen(R_r1_u1, eigenR_r1_u1);
     Sophus::SE3f T_r1_u1(eigenR_r1_u1, Eigen::Vector3f::Zero());
@@ -546,7 +546,7 @@ std::string Settings::Str() const {
     );
   }
 
-  if (sensor_ == System::STEREO || sensor_ == System::IMU_STEREO) {
+  if (sensor_ == Sensor::Stereo || sensor_ == Sensor::InertialStereo) {
     output += fmt::format(
       "- Camera 2 parameters ({}): [ {:.6f} ]\n",
       (cameraType_ == PinHole || cameraType_ == Rectified) ? "Pinhole" : "Kannala-Brandt",
@@ -583,7 +583,7 @@ std::string Settings::Str() const {
       fmt::join(calibration1_->parameters(), " ")
     );
 
-    if ((sensor_ == System::STEREO || sensor_ == System::IMU_STEREO) && cameraType_ == KannalaBrandt) {
+    if ((sensor_ == Sensor::Stereo || sensor_ == Sensor::InertialStereo) && cameraType_ == KannalaBrandt) {
       output += fmt::format(
         "- Camera 2 parameters after resize: [ {:.6f} ]\n",
         fmt::join(calibration2_->parameters(), " ")
@@ -593,7 +593,7 @@ std::string Settings::Str() const {
 
   output += fmt::format("- Sequence FPS: {}\n", fps_);
 
-  if (sensor_ == System::STEREO || sensor_ == System::IMU_STEREO) {
+  if (sensor_ == Sensor::Stereo || sensor_ == Sensor::InertialStereo) {
     output += fmt::format("- Stereo baseline: {:.6f}\n", b_);
     output += fmt::format("- Stereo depth threshold: {:.6f}\n", thDepth_);
 
@@ -614,7 +614,7 @@ std::string Settings::Str() const {
     }
   }
 
-  if (sensor_ == System::IMU_MONOCULAR || sensor_ == System::IMU_STEREO || sensor_ == System::IMU_RGBD) {
+  if (sensor_ == Sensor::InertialMonocular || sensor_ == Sensor::InertialStereo || sensor_ == Sensor::InertialRGBD) {
     // clang-format off
     output += fmt::format("- Gyro noise: {:.6f}\n"         , noiseGyro_   );
     output += fmt::format("- Accelerometer noise: {:.6f}\n", noiseAcc_    );
@@ -624,7 +624,7 @@ std::string Settings::Str() const {
     // clang-format on
   }
 
-  if (sensor_ == System::RGBD || sensor_ == System::IMU_RGBD) {
+  if (sensor_ == Sensor::RGBD || sensor_ == Sensor::InertialRGBD) {
     output += fmt::format("- RGB-D depth map factor: {}\n", depthMapFactor_);
   }
 
