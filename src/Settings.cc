@@ -133,7 +133,7 @@ Settings::Settings(const std::string& configFile, Sensor sensor)
   _logger->info("Camera 1 loaded");
 
   // Read second camera if stereo (not rectified)
-  if (sensor_ == Sensor::Stereo || sensor_ == Sensor::InertialStereo) {
+  if (IsStereoBased(sensor_)) {
     readCamera2(fSettings);
     _logger->info("Camera 2 loaded");
   }
@@ -142,12 +142,12 @@ Settings::Settings(const std::string& configFile, Sensor sensor)
   readImageInfo(fSettings);
   _logger->info("Camera info loaded");
 
-  if (sensor_ == Sensor::InertialMonocular || sensor_ == Sensor::InertialStereo || sensor_ == Sensor::InertialRGBD) {
+  if (IsInertialBased(sensor_)) {
     readIMU(fSettings);
     _logger->info("IMU calibration loaded");
   }
 
-  if (sensor_ == Sensor::RGBD || sensor_ == Sensor::InertialRGBD) {
+  if (IsRGBDBased(sensor_)) {
     readRGBD(fSettings);
     _logger->info("RGB-D calibration loaded");
   }
@@ -205,7 +205,7 @@ void Settings::readCamera1(cv::FileStorage& fSettings) {
     }
 
     // Check if we need to correct distortion from the images
-    if ((sensor_ == Sensor::Monocular || sensor_ == Sensor::InertialMonocular) && vPinHoleDistorsion1_.size() != 0) {
+    if (IsMonocularBased(sensor_) && vPinHoleDistorsion1_.size() != 0) {
       bNeedToUndistort_ = true;
     }
   } else if (cameraModel == "Rectified") {
@@ -242,7 +242,7 @@ void Settings::readCamera1(cv::FileStorage& fSettings) {
     calibration1_   = new KannalaBrandt8(vCalibration);
     originalCalib1_ = new KannalaBrandt8(vCalibration);
 
-    if (sensor_ == Sensor::Stereo || sensor_ == Sensor::InertialStereo) {
+    if (IsStereoBased(sensor_)) {
       int              colBegin = readParameter<int>(fSettings, "Camera1.overlappingBegin", found);
       int              colEnd   = readParameter<int>(fSettings, "Camera1.overlappingEnd", found);
       std::vector<int> vOverlapping = {colBegin, colEnd};
@@ -347,7 +347,7 @@ void Settings::readImageInfo(cv::FileStorage& fSettings) {
       calibration1_->setParameter(calibration1_->getParameter(1) * scaleRowFactor, 1);
       calibration1_->setParameter(calibration1_->getParameter(3) * scaleRowFactor, 3);
 
-      if ((sensor_ == Sensor::Stereo || sensor_ == Sensor::InertialStereo) && cameraType_ != Rectified) {
+      if (IsStereoBased(sensor_) && cameraType_ != Rectified) {
         calibration2_->setParameter(calibration2_->getParameter(1) * scaleRowFactor, 1);
         calibration2_->setParameter(calibration2_->getParameter(3) * scaleRowFactor, 3);
       }
@@ -365,7 +365,7 @@ void Settings::readImageInfo(cv::FileStorage& fSettings) {
       calibration1_->setParameter(calibration1_->getParameter(0) * scaleColFactor, 0);
       calibration1_->setParameter(calibration1_->getParameter(2) * scaleColFactor, 2);
 
-      if ((sensor_ == Sensor::Stereo || sensor_ == Sensor::InertialStereo) && cameraType_ != Rectified) {
+      if (IsStereoBased(sensor_) && cameraType_ != Rectified) {
         calibration2_->setParameter(calibration2_->getParameter(0) * scaleColFactor, 0);
         calibration2_->setParameter(calibration2_->getParameter(2) * scaleColFactor, 2);
 
@@ -546,7 +546,7 @@ std::string Settings::Str() const {
     );
   }
 
-  if (sensor_ == Sensor::Stereo || sensor_ == Sensor::InertialStereo) {
+  if (IsStereoBased(sensor_)) {
     output += fmt::format(
       "- Camera 2 parameters ({}): [ {:.6f} ]\n",
       (cameraType_ == PinHole || cameraType_ == Rectified) ? "Pinhole" : "Kannala-Brandt",
@@ -583,7 +583,7 @@ std::string Settings::Str() const {
       fmt::join(calibration1_->parameters(), " ")
     );
 
-    if ((sensor_ == Sensor::Stereo || sensor_ == Sensor::InertialStereo) && cameraType_ == KannalaBrandt) {
+    if (IsStereoBased(sensor_) && cameraType_ == KannalaBrandt) {
       output += fmt::format(
         "- Camera 2 parameters after resize: [ {:.6f} ]\n",
         fmt::join(calibration2_->parameters(), " ")
@@ -593,7 +593,7 @@ std::string Settings::Str() const {
 
   output += fmt::format("- Sequence FPS: {}\n", fps_);
 
-  if (sensor_ == Sensor::Stereo || sensor_ == Sensor::InertialStereo) {
+  if (IsStereoBased(sensor_)) {
     output += fmt::format("- Stereo baseline: {:.6f}\n", b_);
     output += fmt::format("- Stereo depth threshold: {:.6f}\n", thDepth_);
 
@@ -614,7 +614,7 @@ std::string Settings::Str() const {
     }
   }
 
-  if (sensor_ == Sensor::InertialMonocular || sensor_ == Sensor::InertialStereo || sensor_ == Sensor::InertialRGBD) {
+  if (IsInertialBased(sensor_)) {
     // clang-format off
     output += fmt::format("- Gyro noise: {:.6f}\n"         , noiseGyro_   );
     output += fmt::format("- Accelerometer noise: {:.6f}\n", noiseAcc_    );
@@ -624,7 +624,7 @@ std::string Settings::Str() const {
     // clang-format on
   }
 
-  if (sensor_ == Sensor::RGBD || sensor_ == Sensor::InertialRGBD) {
+  if (IsRGBDBased(sensor_)) {
     output += fmt::format("- RGB-D depth map factor: {}\n", depthMapFactor_);
   }
 

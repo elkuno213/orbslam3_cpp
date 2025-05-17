@@ -148,11 +148,12 @@ enable_testing()
 include(GoogleTest)
 
 set(TEST_FILES
+  test/Common_test.cc
   test/LoggingUtils_test.cc
-  test/Settings_test.cc
   test/MapDrawer_test.cc
-  test/Viewer_test.cc
+  test/Settings_test.cc
   test/Tracking_test.cc
+  test/Viewer_test.cc
 )
 
 foreach(TEST_FILE ${TEST_FILES})

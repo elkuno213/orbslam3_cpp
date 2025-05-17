@@ -136,7 +136,7 @@ void LoopClosing::Run() {
 #endif
       if (bFindedRegion) {
         if (mbMergeDetected) {
-          if ((mpTracker->mSensor == Sensor::InertialMonocular || mpTracker->mSensor == Sensor::InertialStereo || mpTracker->mSensor == Sensor::InertialRGBD) && (!mpCurrentKF->GetMap()->isImuInitialized())) {
+          if (IsInertialBased(mpTracker->mSensor) && (!mpCurrentKF->GetMap()->isImuInitialized())) {
             _logger->warn("Merge aborted: IMU is not initialized");
           } else {
             Sophus::SE3d mTmw = mpMergeMatchedKF->GetPose().cast<double>();
@@ -164,7 +164,7 @@ void LoopClosing::Run() {
                 continue;
               }
               // If inertial, force only yaw
-              if ((mpTracker->mSensor == Sensor::InertialMonocular || mpTracker->mSensor == Sensor::InertialStereo || mpTracker->mSensor == Sensor::InertialRGBD) && mpCurrentKF->GetMap()->GetIniertialBA1()) {
+              if (IsInertialBased(mpTracker->mSensor) && mpCurrentKF->GetMap()->GetIniertialBA1()) {
                 Eigen::Vector3d phi = LogSO3(mSold_new.rotation().toRotationMatrix());
                 phi(0)              = 0;
                 phi(1)              = 0;
@@ -186,7 +186,7 @@ void LoopClosing::Run() {
             nMerges += 1;
 #endif
             // TODO UNCOMMENT
-            if (mpTracker->mSensor == Sensor::InertialMonocular || mpTracker->mSensor == Sensor::InertialStereo || mpTracker->mSensor == Sensor::InertialRGBD) {
+            if (IsInertialBased(mpTracker->mSensor)) {
               MergeLocal2();
             } else {
               MergeLocal();
@@ -254,7 +254,7 @@ void LoopClosing::Run() {
             if (std::fabs(phi(0)) < 0.008f && std::fabs(phi(1)) < 0.008f && std::fabs(phi(2)) < 0.349f) {
               if (mpCurrentKF->GetMap()->IsInertial()) {
                 // If inertial, force only yaw
-                if ((mpTracker->mSensor == Sensor::InertialMonocular || mpTracker->mSensor == Sensor::InertialStereo || mpTracker->mSensor == Sensor::InertialRGBD) && mpCurrentKF->GetMap()->GetIniertialBA2()) {
+                if (IsInertialBased(mpTracker->mSensor) && mpCurrentKF->GetMap()->GetIniertialBA2()) {
                   phi(0)      = 0;
                   phi(1)      = 0;
                   g2oSww_new  = g2o::Sim3(ExpSO3(phi), g2oSww_new.translation(), 1.0);
@@ -1735,8 +1735,7 @@ void LoopClosing::MergeLocal() {
     spMergeConnectedKFs.end(),
     std::back_inserter(vpMergeConnectedKFs)
   );
-  if (mpTracker->mSensor == Sensor::InertialMonocular || mpTracker->mSensor == Sensor::InertialStereo || mpTracker->mSensor == Sensor::InertialRGBD)
-    {
+  if (IsInertialBased(mpTracker->mSensor)) {
     Optimizer::MergeInertialBA(mpCurrentKF, mpMergeMatchedKF, &bStop, pCurrentMap, vCorrectedSim3);
   } else {
     Optimizer::LocalBundleAdjustment(
@@ -1980,7 +1979,7 @@ void LoopClosing::MergeLocal2() {
 
   const int numKFnew = pCurrentMap->KeyFramesInMap();
 
-  if ((mpTracker->mSensor == Sensor::InertialMonocular || mpTracker->mSensor == Sensor::InertialStereo || mpTracker->mSensor == Sensor::InertialRGBD) && !pCurrentMap->GetIniertialBA2()) {
+  if (IsInertialBased(mpTracker->mSensor) && !pCurrentMap->GetIniertialBA2()) {
     // Map is not completly initialized
     Eigen::Vector3d bg, ba;
     bg << 0., 0., 0.;

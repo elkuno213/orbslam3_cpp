@@ -181,7 +181,7 @@ System::System(
     // usleep(10*1000*1000);
   }
 
-  if (mSensor == Sensor::InertialStereo || mSensor == Sensor::InertialMonocular || mSensor == Sensor::InertialRGBD) {
+  if (IsInertialBased(mSensor)) {
     mpAtlas->SetInertialSensor();
   }
 
@@ -210,9 +210,8 @@ System::System(
   mpLocalMapper = new LocalMapping(
     this,
     mpAtlas,
-    mSensor == Sensor::Monocular || mSensor == Sensor::InertialMonocular,
-    mSensor == Sensor::InertialMonocular || mSensor == Sensor::InertialStereo
-      || mSensor == Sensor::InertialRGBD,
+    IsMonocularBased(mSensor),
+    IsInertialBased(mSensor),
     strSequence
   );
   mptLocalMapping        = new std::thread(&ORB_SLAM3::LocalMapping::Run, mpLocalMapper);
@@ -275,7 +274,7 @@ Sophus::SE3f System::TrackStereo(
   const std::vector<IMU::Point>& vImuMeas,
   std::string                    filename
 ) {
-  if (mSensor != Sensor::Stereo && mSensor != Sensor::InertialStereo) {
+  if (!IsStereoBased(mSensor)) {
     throw std::runtime_error("Invalid sensor type, it should be Stereo or Stereo-Inertial");
   }
 
@@ -373,7 +372,7 @@ Sophus::SE3f System::TrackRGBD(
   const std::vector<IMU::Point>& vImuMeas,
   std::string                    filename
 ) {
-  if (mSensor != Sensor::RGBD && mSensor != Sensor::InertialRGBD) {
+  if (!IsRGBDBased(mSensor)) {
     throw std::runtime_error("Invalid sensor type, it should be RGB-D or RGB-D Inertial");
   }
 
@@ -466,7 +465,7 @@ Sophus::SE3f System::TrackMonocular(
     }
   }
 
-  if (mSensor != Sensor::Monocular && mSensor != Sensor::InertialMonocular) {
+  if (!IsMonocularBased(mSensor)) {
     throw std::runtime_error("Invalid sensor type, it should be Monocular or Monocular-Inertial");
   }
 
@@ -748,7 +747,7 @@ void System::SaveTrajectoryEuRoC(const std::string& filename) {
   // Transform all keyframes so that the first keyframe is at the origin.
   // After a loop closure the first keyframe might not be at the origin.
   Sophus::SE3f Twb; // Can be word to cam0 or world to b depending on IMU or not.
-  if (mSensor == Sensor::InertialMonocular || mSensor == Sensor::InertialStereo || mSensor == Sensor::InertialRGBD) {
+  if (IsInertialBased(mSensor)) {
     Twb = vpKFs[0]->GetImuPose();
   } else {
     Twb = vpKFs[0]->GetPoseInverse();
@@ -803,7 +802,7 @@ void System::SaveTrajectoryEuRoC(const std::string& filename) {
 
     Trw = Trw * pKF->GetPose() * Twb; // Tcp*Tpw*Twb0=Tcb0 where b0 is the new world reference
 
-    if (mSensor == Sensor::InertialMonocular || mSensor == Sensor::InertialStereo || mSensor == Sensor::InertialRGBD) {
+    if (IsInertialBased(mSensor)) {
       Sophus::SE3f       Twb = (pKF->mImuCalib.mTbc * (*lit) * Trw).inverse();
       Eigen::Quaternionf q   = Twb.unit_quaternion();
       Eigen::Vector3f    twb = Twb.translation();
@@ -839,7 +838,7 @@ void System::SaveTrajectoryEuRoC(const std::string& filename, Map* pMap) {
   // Transform all keyframes so that the first keyframe is at the origin.
   // After a loop closure the first keyframe might not be at the origin.
   Sophus::SE3f Twb; // Can be word to cam0 or world to b dependingo on IMU or not.
-  if (mSensor == Sensor::InertialMonocular || mSensor == Sensor::InertialStereo || mSensor == Sensor::InertialRGBD) {
+  if (IsInertialBased(mSensor)) {
     Twb = vpKFs[0]->GetImuPose();
   } else {
     Twb = vpKFs[0]->GetPoseInverse();
@@ -893,7 +892,7 @@ void System::SaveTrajectoryEuRoC(const std::string& filename, Map* pMap) {
 
     Trw = Trw * pKF->GetPose() * Twb; // Tcp*Tpw*Twb0=Tcb0 where b0 is the new world reference
 
-    if (mSensor == Sensor::InertialMonocular || mSensor == Sensor::InertialStereo || mSensor == Sensor::InertialRGBD) {
+    if (IsInertialBased(mSensor)) {
       Sophus::SE3f       Twb = (pKF->mImuCalib.mTbc * (*lit) * Trw).inverse();
       Eigen::Quaternionf q   = Twb.unit_quaternion();
       Eigen::Vector3f    twb = Twb.translation();
@@ -940,8 +939,7 @@ void System::SaveTrajectoryEuRoC(const std::string& filename, Map* pMap) {
     // Transform all keyframes so that the first keyframe is at the origin.
     // After a loop closure the first keyframe might not be at the origin.
     Sophus::SE3f Twb; // Can be word to cam0 or world to b dependingo on IMU or not.
-    if (mSensor==Sensor::InertialMonocular || mSensor==Sensor::InertialStereo ||
-mSensor==Sensor::InertialRGBD) Twb = vpKFs[0]->GetImuPose_(); else Twb =
+    if (IsInertialBased(mSensor)) Twb = vpKFs[0]->GetImuPose_(); else Twb =
 vpKFs[0]->GetPoseInverse_();
 
     std::ofstream f;
@@ -1006,8 +1004,7 @@ keyframe. if (!pKF) continue;
         // std::cout << "4" << std::endl;
 
 
-        if (mSensor == Sensor::InertialMonocular || mSensor == Sensor::InertialStereo ||
-mSensor==Sensor::InertialRGBD)
+        if (IsInertialBased(mSensor))
         {
             Sophus::SE3f Tbw = pKF->mImuCalib.Tbc_ * (*lit) * Trw;
             Sophus::SE3f Twb = Tbw.inverse();
@@ -1070,8 +1067,7 @@ mSensor==Sensor::InertialRGBD)
 
         if(pKF->isBad())
             continue;
-        if (mSensor == Sensor::InertialMonocular || mSensor == Sensor::InertialStereo ||
-mSensor==Sensor::InertialRGBD)
+        if (IsInertialBased(mSensor))
         {
             cv::Mat R = pKF->GetImuRotation().t();
             std::vector<float> q = Converter::toQuaternion(R);
@@ -1130,7 +1126,7 @@ void System::SaveKeyFrameTrajectoryEuRoC(const std::string& filename) {
     if (!pKF || pKF->isBad()) {
       continue;
     }
-    if (mSensor == Sensor::InertialMonocular || mSensor == Sensor::InertialStereo || mSensor == Sensor::InertialRGBD) {
+    if (IsInertialBased(mSensor)) {
       Sophus::SE3f       Twb = pKF->GetImuPose();
       Eigen::Quaternionf q   = Twb.unit_quaternion();
       Eigen::Vector3f    twb = Twb.translation();
@@ -1168,7 +1164,7 @@ void System::SaveKeyFrameTrajectoryEuRoC(const std::string& filename, Map* pMap)
     if (!pKF || pKF->isBad()) {
       continue;
     }
-    if (mSensor == Sensor::InertialMonocular || mSensor == Sensor::InertialStereo || mSensor == Sensor::InertialRGBD) {
+    if (IsInertialBased(mSensor)) {
       Sophus::SE3f       Twb = pKF->GetImuPose();
       Eigen::Quaternionf q   = Twb.unit_quaternion();
       Eigen::Vector3f    twb = Twb.translation();
