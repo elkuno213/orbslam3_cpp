@@ -3,7 +3,7 @@
   "cmake.configureOnOpen": false,
   // clangd
   "C_Cpp.intelliSenseEngine": "disabled",
-  "clangd.path": "/usr/bin/clangd-15",
+  "clangd.path": "/usr/bin/clangd-16",
   "clangd.arguments": [
     "--query-driver=/usr/bin/c++", // for cross compile usage
     "--compile-commands-dir=${workspaceFolder}/build",
@@ -12,7 +12,8 @@
     "--header-insertion=never"
   ],
   "clangd.fallbackFlags": [
-    "-ferror-limit=0"
+    "-ferror-limit=0",
+    "-std=c++20"
   ],
   "[cpp]": {
     "editor.defaultFormatter": "llvm-vs-code-extensions.vscode-clangd"
