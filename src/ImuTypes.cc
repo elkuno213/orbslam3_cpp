@@ -18,6 +18,7 @@
  */
 
 #include "ImuTypes.h"
+#include <algorithm>
 #include "Converter.h"
 #include "GeometricTools.h"
 
@@ -194,9 +195,9 @@ void Preintegrated::Reintegrate() {
   std::unique_lock<std::mutex>  lock(mMutex);
   const std::vector<integrable> aux = mvMeasurements;
   Initialize(bu);
-  for (std::size_t i = 0; i < aux.size(); i++) {
-    IntegrateNewMeasurement(aux[i].a, aux[i].w, aux[i].t);
-  }
+  std::ranges::for_each(aux, [this](const integrable& measurement) {
+    IntegrateNewMeasurement(measurement.a, measurement.w, measurement.t);
+  });
 }
 
 void Preintegrated::IntegrateNewMeasurement(
@@ -278,12 +279,12 @@ void Preintegrated::MergePrevious(Preintegrated* pPrev) {
   const std::vector<integrable> aux2 = mvMeasurements;
 
   Initialize(bav);
-  for (std::size_t i = 0; i < aux1.size(); i++) {
-    IntegrateNewMeasurement(aux1[i].a, aux1[i].w, aux1[i].t);
-  }
-  for (std::size_t i = 0; i < aux2.size(); i++) {
-    IntegrateNewMeasurement(aux2[i].a, aux2[i].w, aux2[i].t);
-  }
+  std::ranges::for_each(aux1, [this](const integrable& measurement) {
+    IntegrateNewMeasurement(measurement.a, measurement.w, measurement.t);
+  });
+  std::ranges::for_each(aux2, [this](const integrable& measurement) {
+    IntegrateNewMeasurement(measurement.a, measurement.w, measurement.t);
+  });
 }
 
 void Preintegrated::SetNewBias(const Bias& bu_) {

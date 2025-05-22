@@ -46,40 +46,39 @@ int ORBmatcher::SearchByProjection(
 
   const bool bFactor = th != 1.0;
 
-  for (std::size_t iMP = 0; iMP < vpMapPoints.size(); iMP++) {
-    MapPoint* pMP = vpMapPoints[iMP];
-    if (!pMP->mbTrackInView && !pMP->mbTrackInViewR) {
+  for (MapPoint* const mp : vpMapPoints) {
+    if (!mp->mbTrackInView && !mp->mbTrackInViewR) {
       continue;
     }
 
-    if (bFarPoints && pMP->mTrackDepth > thFarPoints) {
+    if (bFarPoints && mp->mTrackDepth > thFarPoints) {
       continue;
     }
 
-    if (pMP->isBad()) {
+    if (mp->isBad()) {
       continue;
     }
 
-    if (pMP->mbTrackInView) {
-      const int& nPredictedLevel = pMP->mnTrackScaleLevel;
+    if (mp->mbTrackInView) {
+      const int& nPredictedLevel = mp->mnTrackScaleLevel;
 
       // The size of the window will depend on the viewing direction
-      float r = RadiusByViewingCos(pMP->mTrackViewCos);
+      float r = RadiusByViewingCos(mp->mTrackViewCos);
 
       if (bFactor) {
         r *= th;
       }
 
       const std::vector<std::size_t> vIndices = F.GetFeaturesInArea(
-        pMP->mTrackProjX,
-        pMP->mTrackProjY,
+        mp->mTrackProjX,
+        mp->mTrackProjY,
         r * F.mvScaleFactors[nPredictedLevel],
         nPredictedLevel - 1,
         nPredictedLevel
       );
 
       if (!vIndices.empty()) {
-        const cv::Mat MPdescriptor = pMP->GetDescriptor();
+        const cv::Mat MPdescriptor = mp->GetDescriptor();
 
         int bestDist   = 256;
         int bestLevel  = -1;
@@ -88,11 +87,7 @@ int ORBmatcher::SearchByProjection(
         int bestIdx    = -1;
 
         // Get best and second matches with near keypoints
-        for (std::vector<std::size_t>::const_iterator vit = vIndices.begin(), vend = vIndices.end();
-             vit != vend;
-             vit++) {
-          const std::size_t idx = *vit;
-
+        for (const std::size_t idx : vIndices) {
           if (F.mvpMapPoints[idx]) {
             if (F.mvpMapPoints[idx]->Observations() > 0) {
               continue;
@@ -100,7 +95,7 @@ int ORBmatcher::SearchByProjection(
           }
 
           if (F.Nleft == -1 && F.mvuRight[idx] > 0) {
-            const float er = std::fabs(pMP->mTrackProjXR - F.mvuRight[idx]);
+            const float er = std::fabs(mp->mTrackProjXR - F.mvuRight[idx]);
             if (er > r * F.mvScaleFactors[nPredictedLevel]) {
               continue;
             }
@@ -133,11 +128,11 @@ int ORBmatcher::SearchByProjection(
           }
 
           if (bestLevel != bestLevel2 || bestDist <= mfNNratio * bestDist2) {
-            F.mvpMapPoints[bestIdx] = pMP;
+            F.mvpMapPoints[bestIdx] = mp;
 
             // Also match with the stereo observation at right camera
             if (F.Nleft != -1 && F.mvLeftToRightMatch[bestIdx] != -1) {
-              F.mvpMapPoints[F.mvLeftToRightMatch[bestIdx] + F.Nleft] = pMP;
+              F.mvpMapPoints[F.mvLeftToRightMatch[bestIdx] + F.Nleft] = mp;
               nmatches++;
               right++;
             }
@@ -149,14 +144,14 @@ int ORBmatcher::SearchByProjection(
       }
     }
 
-    if (F.Nleft != -1 && pMP->mbTrackInViewR) {
-      const int& nPredictedLevel = pMP->mnTrackScaleLevelR;
+    if (F.Nleft != -1 && mp->mbTrackInViewR) {
+      const int& nPredictedLevel = mp->mnTrackScaleLevelR;
       if (nPredictedLevel != -1) {
-        float r = RadiusByViewingCos(pMP->mTrackViewCosR);
+        float r = RadiusByViewingCos(mp->mTrackViewCosR);
 
         const std::vector<std::size_t> vIndices = F.GetFeaturesInArea(
-          pMP->mTrackProjXR,
-          pMP->mTrackProjYR,
+          mp->mTrackProjXR,
+          mp->mTrackProjYR,
           r * F.mvScaleFactors[nPredictedLevel],
           nPredictedLevel - 1,
           nPredictedLevel,
@@ -167,7 +162,7 @@ int ORBmatcher::SearchByProjection(
           continue;
         }
 
-        const cv::Mat MPdescriptor = pMP->GetDescriptor();
+        const cv::Mat MPdescriptor = mp->GetDescriptor();
 
         int bestDist   = 256;
         int bestLevel  = -1;
@@ -176,11 +171,7 @@ int ORBmatcher::SearchByProjection(
         int bestIdx    = -1;
 
         // Get best and second matches with near keypoints
-        for (std::vector<std::size_t>::const_iterator vit = vIndices.begin(), vend = vIndices.end();
-             vit != vend;
-             vit++) {
-          const std::size_t idx = *vit;
-
+        for (const std::size_t idx : vIndices) {
           if (F.mvpMapPoints[idx + F.Nleft]) {
             if (F.mvpMapPoints[idx + F.Nleft]->Observations() > 0) {
               continue;
@@ -211,12 +202,12 @@ int ORBmatcher::SearchByProjection(
 
           // Also match with the stereo observation at right camera
           if (F.Nleft != -1 && F.mvRightToLeftMatch[bestIdx] != -1) {
-            F.mvpMapPoints[F.mvRightToLeftMatch[bestIdx]] = pMP;
+            F.mvpMapPoints[F.mvRightToLeftMatch[bestIdx]] = mp;
             nmatches++;
             left++;
           }
 
-          F.mvpMapPoints[bestIdx + F.Nleft] = pMP;
+          F.mvpMapPoints[bestIdx + F.Nleft] = mp;
           nmatches++;
           right++;
         }
@@ -250,19 +241,17 @@ int ORBmatcher::SearchByBoW(KeyFrame* pKF, Frame& F, std::vector<MapPoint*>& vpM
   const float factor = 1.0f / HISTO_LENGTH;
 
   // We perform the matching over ORB that belong to the same vocabulary node (at a certain level)
-  DBoW2::FeatureVector::const_iterator KFit  = vFeatVecKF.begin();
-  DBoW2::FeatureVector::const_iterator Fit   = F.mFeatVec.begin();
-  DBoW2::FeatureVector::const_iterator KFend = vFeatVecKF.end();
-  DBoW2::FeatureVector::const_iterator Fend  = F.mFeatVec.end();
+  auto KFit  = vFeatVecKF.cbegin();
+  auto Fit   = F.mFeatVec.cbegin();
+  auto KFend = vFeatVecKF.cend();
+  auto Fend  = F.mFeatVec.cend();
 
   while (KFit != KFend && Fit != Fend) {
     if (KFit->first == Fit->first) {
       const std::vector<unsigned int> vIndicesKF = KFit->second;
       const std::vector<unsigned int> vIndicesF  = Fit->second;
 
-      for (std::size_t iKF = 0; iKF < vIndicesKF.size(); iKF++) {
-        const unsigned int realIdxKF = vIndicesKF[iKF];
-
+      for (const unsigned int realIdxKF : vIndicesKF) {
         MapPoint* pMP = vpMapPointsKF[realIdxKF];
 
         if (!pMP) {
@@ -283,10 +272,8 @@ int ORBmatcher::SearchByBoW(KeyFrame* pKF, Frame& F, std::vector<MapPoint*>& vpM
         int bestIdxFR  = -1;
         int bestDist2R = 256;
 
-        for (std::size_t iF = 0; iF < vIndicesF.size(); iF++) {
+        for (const unsigned int realIdxF : vIndicesF) {
           if (F.Nleft == -1) {
-            const unsigned int realIdxF = vIndicesF[iF];
-
             if (vpMapPointMatches[realIdxF]) {
               continue;
             }
@@ -303,8 +290,6 @@ int ORBmatcher::SearchByBoW(KeyFrame* pKF, Frame& F, std::vector<MapPoint*>& vpM
               bestDist2 = dist;
             }
           } else {
-            const unsigned int realIdxF = vIndicesF[iF];
-
             if (vpMapPointMatches[realIdxF]) {
               continue;
             }
@@ -410,8 +395,8 @@ int ORBmatcher::SearchByBoW(KeyFrame* pKF, Frame& F, std::vector<MapPoint*>& vpM
       if (i == ind1 || i == ind2 || i == ind3) {
         continue;
       }
-      for (std::size_t j = 0, jend = rotHist[i].size(); j < jend; j++) {
-        vpMapPointMatches[rotHist[i][j]] = static_cast<MapPoint*>(NULL);
+      for (const int bin : rotHist[i]) {
+        vpMapPointMatches[bin] = static_cast<MapPoint*>(NULL);
         nmatches--;
       }
     }
@@ -444,16 +429,14 @@ int ORBmatcher::SearchByProjection(
   int nmatches = 0;
 
   // For each Candidate MapPoint Project and Match
-  for (int iMP = 0, iendMP = vpPoints.size(); iMP < iendMP; iMP++) {
-    MapPoint* pMP = vpPoints[iMP];
-
+  for (MapPoint* const mp : vpPoints) {
     // Discard Bad MapPoints and already found
-    if (pMP->isBad() || spAlreadyFound.count(pMP)) {
+    if (mp->isBad() || spAlreadyFound.count(mp)) {
       continue;
     }
 
     // Get 3D Coords.
-    Eigen::Vector3f p3Dw = pMP->GetWorldPos();
+    Eigen::Vector3f p3Dw = mp->GetWorldPos();
 
     // Transform into Camera Coords.
     Eigen::Vector3f p3Dc = Tcw * p3Dw;
@@ -472,8 +455,8 @@ int ORBmatcher::SearchByProjection(
     }
 
     // Depth must be inside the scale invariance region of the point
-    const float     maxDistance = pMP->GetMaxDistanceInvariance();
-    const float     minDistance = pMP->GetMinDistanceInvariance();
+    const float     maxDistance = mp->GetMaxDistanceInvariance();
+    const float     minDistance = mp->GetMinDistanceInvariance();
     Eigen::Vector3f PO          = p3Dw - Ow;
     const float     dist        = PO.norm();
 
@@ -482,13 +465,13 @@ int ORBmatcher::SearchByProjection(
     }
 
     // Viewing angle must be less than 60 deg
-    Eigen::Vector3f Pn = pMP->GetNormal();
+    Eigen::Vector3f Pn = mp->GetNormal();
 
     if (PO.dot(Pn) < 0.5 * dist) {
       continue;
     }
 
-    int nPredictedLevel = pMP->PredictScale(dist, pKF);
+    int nPredictedLevel = mp->PredictScale(dist, pKF);
 
     // Search in a radius
     const float radius = th * pKF->mvScaleFactors[nPredictedLevel];
@@ -500,14 +483,11 @@ int ORBmatcher::SearchByProjection(
     }
 
     // Match to the most similar keypoint in the radius
-    const cv::Mat dMP = pMP->GetDescriptor();
+    const cv::Mat dMP = mp->GetDescriptor();
 
     int bestDist = 256;
     int bestIdx  = -1;
-    for (std::vector<std::size_t>::const_iterator vit = vIndices.begin(), vend = vIndices.end();
-         vit != vend;
-         vit++) {
-      const std::size_t idx = *vit;
+    for (const std::size_t idx : vIndices) {
       if (vpMatched[idx]) {
         continue;
       }
@@ -529,7 +509,7 @@ int ORBmatcher::SearchByProjection(
     }
 
     if (bestDist <= TH_LOW * ratioHamming) {
-      vpMatched[bestIdx] = pMP;
+      vpMatched[bestIdx] = mp;
       nmatches++;
     }
   }
@@ -563,7 +543,7 @@ int ORBmatcher::SearchByProjection(
   int nmatches = 0;
 
   // For each Candidate MapPoint Project and Match
-  for (int iMP = 0, iendMP = vpPoints.size(); iMP < iendMP; iMP++) {
+  for (std::size_t iMP = 0; iMP < vpPoints.size(); iMP++) {
     MapPoint* pMP  = vpPoints[iMP];
     KeyFrame* pKFi = vpPointsKFs[iMP];
 
@@ -629,10 +609,7 @@ int ORBmatcher::SearchByProjection(
 
     int bestDist = 256;
     int bestIdx  = -1;
-    for (std::vector<std::size_t>::const_iterator vit = vIndices.begin(), vend = vIndices.end();
-         vit != vend;
-         vit++) {
-      const std::size_t idx = *vit;
+    for (const std::size_t idx : vIndices) {
       if (vpMatched[idx]) {
         continue;
       }
@@ -682,7 +659,7 @@ int ORBmatcher::SearchForInitialization(
   std::vector<int> vMatchedDistance(F2.mvKeysUn.size(), INT_MAX);
   std::vector<int> vnMatches21(F2.mvKeysUn.size(), -1);
 
-  for (std::size_t i1 = 0, iend1 = F1.mvKeysUn.size(); i1 < iend1; i1++) {
+  for (std::size_t i1 = 0; i1 < F1.mvKeysUn.size(); i1++) {
     cv::KeyPoint kp1    = F1.mvKeysUn[i1];
     int          level1 = kp1.octave;
     if (level1 > 0) {
@@ -702,10 +679,7 @@ int ORBmatcher::SearchForInitialization(
     int bestDist2 = INT_MAX;
     int bestIdx2  = -1;
 
-    for (std::vector<std::size_t>::iterator vit = vIndices2.begin(); vit != vIndices2.end();
-         vit++) {
-      std::size_t i2 = *vit;
-
+    for (const std::size_t i2 : vIndices2) {
       cv::Mat d2 = F2.mDescriptors.row(i2);
 
       int dist = DescriptorDistance(d1, d2);
@@ -761,8 +735,7 @@ int ORBmatcher::SearchForInitialization(
       if (i == ind1 || i == ind2 || i == ind3) {
         continue;
       }
-      for (std::size_t j = 0, jend = rotHist[i].size(); j < jend; j++) {
-        int idx1 = rotHist[i][j];
+      for (const int idx1 : rotHist[i]) {
         if (vnMatches12[idx1] >= 0) {
           vnMatches12[idx1] = -1;
           nmatches--;
@@ -772,7 +745,7 @@ int ORBmatcher::SearchForInitialization(
   }
 
   // Update prev matched
-  for (std::size_t i1 = 0, iend1 = vnMatches12.size(); i1 < iend1; i1++) {
+  for (std::size_t i1 = 0; i1 < vnMatches12.size(); i1++) {
     if (vnMatches12[i1] >= 0) {
       vbPrevMatched[i1] = F2.mvKeysUn[vnMatches12[i1]].pt;
     }
@@ -804,15 +777,14 @@ int ORBmatcher::SearchByBoW(KeyFrame* pKF1, KeyFrame* pKF2, std::vector<MapPoint
 
   int nmatches = 0;
 
-  DBoW2::FeatureVector::const_iterator f1it  = vFeatVec1.begin();
-  DBoW2::FeatureVector::const_iterator f2it  = vFeatVec2.begin();
-  DBoW2::FeatureVector::const_iterator f1end = vFeatVec1.end();
-  DBoW2::FeatureVector::const_iterator f2end = vFeatVec2.end();
+  auto f1it  = vFeatVec1.cbegin();
+  auto f2it  = vFeatVec2.cbegin();
+  auto f1end = vFeatVec1.cend();
+  auto f2end = vFeatVec2.cend();
 
   while (f1it != f1end && f2it != f2end) {
     if (f1it->first == f2it->first) {
-      for (std::size_t i1 = 0, iend1 = f1it->second.size(); i1 < iend1; i1++) {
-        const std::size_t idx1 = f1it->second[i1];
+      for (const std::size_t idx1 : f1it->second) {
         if (pKF1->NLeft != -1 && idx1 >= pKF1->mvKeysUn.size()) {
           continue;
         }
@@ -831,9 +803,7 @@ int ORBmatcher::SearchByBoW(KeyFrame* pKF1, KeyFrame* pKF2, std::vector<MapPoint
         int bestIdx2  = -1;
         int bestDist2 = 256;
 
-        for (std::size_t i2 = 0, iend2 = f2it->second.size(); i2 < iend2; i2++) {
-          const std::size_t idx2 = f2it->second[i2];
-
+        for (const std::size_t idx2 : f2it->second) {
           if (pKF2->NLeft != -1 && idx2 >= pKF2->mvKeysUn.size()) {
             continue;
           }
@@ -903,8 +873,8 @@ int ORBmatcher::SearchByBoW(KeyFrame* pKF1, KeyFrame* pKF2, std::vector<MapPoint
       if (i == ind1 || i == ind2 || i == ind3) {
         continue;
       }
-      for (std::size_t j = 0, jend = rotHist[i].size(); j < jend; j++) {
-        vpMatches12[rotHist[i][j]] = static_cast<MapPoint*>(NULL);
+      for (const int bin : rotHist[i]) {
+        vpMatches12[bin] = static_cast<MapPoint*>(NULL);
         nmatches--;
       }
     }
@@ -970,16 +940,14 @@ int ORBmatcher::SearchForTriangulation(
 
   const float factor = 1.0f / HISTO_LENGTH;
 
-  DBoW2::FeatureVector::const_iterator f1it  = vFeatVec1.begin();
-  DBoW2::FeatureVector::const_iterator f2it  = vFeatVec2.begin();
-  DBoW2::FeatureVector::const_iterator f1end = vFeatVec1.end();
-  DBoW2::FeatureVector::const_iterator f2end = vFeatVec2.end();
+  auto f1it  = vFeatVec1.cbegin();
+  auto f2it  = vFeatVec2.cbegin();
+  auto f1end = vFeatVec1.cend();
+  auto f2end = vFeatVec2.cend();
 
   while (f1it != f1end && f2it != f2end) {
     if (f1it->first == f2it->first) {
-      for (std::size_t i1 = 0, iend1 = f1it->second.size(); i1 < iend1; i1++) {
-        const std::size_t idx1 = f1it->second[i1];
-
+      for (const std::size_t idx1 : f1it->second) {
         MapPoint* pMP1 = pKF1->GetMapPoint(idx1);
 
         // If there is already a MapPoint skip
@@ -1006,9 +974,7 @@ int ORBmatcher::SearchForTriangulation(
         int bestDist = TH_LOW;
         int bestIdx2 = -1;
 
-        for (std::size_t i2 = 0, iend2 = f2it->second.size(); i2 < iend2; i2++) {
-          std::size_t idx2 = f2it->second[i2];
-
+        for (std::size_t idx2 : f2it->second) {
           MapPoint* pMP2 = pKF2->GetMapPoint(idx2);
 
           // If we have already matched or there is a MapPoint skip
@@ -1126,8 +1092,8 @@ int ORBmatcher::SearchForTriangulation(
       if (i == ind1 || i == ind2 || i == ind3) {
         continue;
       }
-      for (std::size_t j = 0, jend = rotHist[i].size(); j < jend; j++) {
-        vMatches12[rotHist[i][j]] = -1;
+      for (const int bin : rotHist[i]) {
+        vMatches12[bin] = -1;
         nmatches--;
       }
     }
@@ -1136,7 +1102,7 @@ int ORBmatcher::SearchForTriangulation(
   vMatchedPairs.clear();
   vMatchedPairs.reserve(nmatches);
 
-  for (std::size_t i = 0, iend = vMatches12.size(); i < iend; i++) {
+  for (std::size_t i = 0; i < vMatches12.size(); i++) {
     if (vMatches12[i] < 0) {
       continue;
     }
@@ -1171,28 +1137,24 @@ int ORBmatcher::Fuse(
 
   int nFused = 0;
 
-  const int nMPs = vpMapPoints.size();
-
   // For debbuging
   int count_notMP = 0, count_bad = 0, count_isinKF = 0, count_negdepth = 0, count_notinim = 0,
       count_dist = 0, count_normal = 0, count_notidx = 0, count_thcheck = 0;
-  for (int i = 0; i < nMPs; i++) {
-    MapPoint* pMP = vpMapPoints[i];
-
-    if (!pMP) {
+  for (MapPoint* const mp : vpMapPoints) {
+    if (!mp) {
       count_notMP++;
       continue;
     }
 
-    if (pMP->isBad()) {
+    if (mp->isBad()) {
       count_bad++;
       continue;
-    } else if (pMP->IsInKeyFrame(pKF)) {
+    } else if (mp->IsInKeyFrame(pKF)) {
       count_isinKF++;
       continue;
     }
 
-    Eigen::Vector3f p3Dw = pMP->GetWorldPos();
+    Eigen::Vector3f p3Dw = mp->GetWorldPos();
     Eigen::Vector3f p3Dc = Tcw * p3Dw;
 
     // Depth must be positive
@@ -1213,8 +1175,8 @@ int ORBmatcher::Fuse(
 
     const float ur = uv(0) - bf * invz;
 
-    const float     maxDistance = pMP->GetMaxDistanceInvariance();
-    const float     minDistance = pMP->GetMinDistanceInvariance();
+    const float     maxDistance = mp->GetMaxDistanceInvariance();
+    const float     minDistance = mp->GetMinDistanceInvariance();
     Eigen::Vector3f PO          = p3Dw - Ow;
     const float     dist3D      = PO.norm();
 
@@ -1225,14 +1187,14 @@ int ORBmatcher::Fuse(
     }
 
     // Viewing angle must be less than 60 deg
-    Eigen::Vector3f Pn = pMP->GetNormal();
+    Eigen::Vector3f Pn = mp->GetNormal();
 
     if (PO.dot(Pn) < 0.5 * dist3D) {
       count_normal++;
       continue;
     }
 
-    int nPredictedLevel = pMP->PredictScale(dist3D, pKF);
+    int nPredictedLevel = mp->PredictScale(dist3D, pKF);
 
     // Search in a radius
     const float radius = th * pKF->mvScaleFactors[nPredictedLevel];
@@ -1246,17 +1208,14 @@ int ORBmatcher::Fuse(
 
     // Match to the most similar keypoint in the radius
 
-    const cv::Mat dMP = pMP->GetDescriptor();
+    const cv::Mat dMP = mp->GetDescriptor();
 
     int bestDist = 256;
     int bestIdx  = -1;
-    for (std::vector<std::size_t>::const_iterator vit = vIndices.begin(), vend = vIndices.end();
-         vit != vend;
-         vit++) {
-      std::size_t         idx = *vit;
-      const cv::KeyPoint& kp  = (pKF->NLeft == -1) ? pKF->mvKeysUn[idx]
-                              : (!bRight)          ? pKF->mvKeys[idx]
-                                                   : pKF->mvKeysRight[idx];
+    for (std::size_t idx : vIndices) {
+      const cv::KeyPoint& kp = (pKF->NLeft == -1) ? pKF->mvKeysUn[idx]
+                             : (!bRight)          ? pKF->mvKeys[idx]
+                                                  : pKF->mvKeysRight[idx];
 
       const int& kpLevel = kp.octave;
 
@@ -1308,15 +1267,15 @@ int ORBmatcher::Fuse(
       MapPoint* pMPinKF = pKF->GetMapPoint(bestIdx);
       if (pMPinKF) {
         if (!pMPinKF->isBad()) {
-          if (pMPinKF->Observations() > pMP->Observations()) {
-            pMP->Replace(pMPinKF);
+          if (pMPinKF->Observations() > mp->Observations()) {
+            mp->Replace(pMPinKF);
           } else {
-            pMPinKF->Replace(pMP);
+            pMPinKF->Replace(mp);
           }
         }
       } else {
-        pMP->AddObservation(pKF, bestIdx);
-        pKF->AddMapPoint(pMP, bestIdx);
+        mp->AddObservation(pKF, bestIdx);
+        pKF->AddMapPoint(mp, bestIdx);
       }
       nFused++;
     } else {
@@ -1349,10 +1308,8 @@ int ORBmatcher::Fuse(
 
   int nFused = 0;
 
-  const int nPoints = vpPoints.size();
-
   // For each candidate MapPoint project and match
-  for (int iMP = 0; iMP < nPoints; iMP++) {
+  for (std::size_t iMP = 0; iMP < vpPoints.size(); iMP++) {
     MapPoint* pMP = vpPoints[iMP];
 
     // Discard Bad MapPoints and already found
@@ -1414,10 +1371,8 @@ int ORBmatcher::Fuse(
 
     int bestDist = INT_MAX;
     int bestIdx  = -1;
-    for (std::vector<std::size_t>::const_iterator vit = vIndices.begin(); vit != vIndices.end();
-         vit++) {
-      const std::size_t idx     = *vit;
-      const int&        kpLevel = pKF->mvKeysUn[idx].octave;
+    for (const std::size_t idx : vIndices) {
+      const int& kpLevel = pKF->mvKeysUn[idx].octave;
 
       if (kpLevel < nPredictedLevel - 1 || kpLevel > nPredictedLevel) {
         continue;
@@ -1552,11 +1507,7 @@ int ORBmatcher::SearchBySim3(
 
     int bestDist = INT_MAX;
     int bestIdx  = -1;
-    for (std::vector<std::size_t>::const_iterator vit = vIndices.begin(), vend = vIndices.end();
-         vit != vend;
-         vit++) {
-      const std::size_t idx = *vit;
-
+    for (const std::size_t idx : vIndices) {
       const cv::KeyPoint& kp = pKF2->mvKeysUn[idx];
 
       if (kp.octave < nPredictedLevel - 1 || kp.octave > nPredictedLevel) {
@@ -1637,11 +1588,7 @@ int ORBmatcher::SearchBySim3(
 
     int bestDist = INT_MAX;
     int bestIdx  = -1;
-    for (std::vector<std::size_t>::const_iterator vit = vIndices.begin(), vend = vIndices.end();
-         vit != vend;
-         vit++) {
-      const std::size_t idx = *vit;
-
+    for (const std::size_t idx : vIndices) {
       const cv::KeyPoint& kp = pKF1->mvKeysUn[idx];
 
       if (kp.octave < nPredictedLevel - 1 || kp.octave > nPredictedLevel) {
@@ -1754,12 +1701,7 @@ int ORBmatcher::SearchByProjection(
         int bestDist = 256;
         int bestIdx2 = -1;
 
-        for (std::vector<std::size_t>::const_iterator vit  = vIndices2.begin(),
-                                                      vend = vIndices2.end();
-             vit != vend;
-             vit++) {
-          const std::size_t i2 = *vit;
-
+        for (const std::size_t i2 : vIndices2) {
           if (CurrentFrame.mvpMapPoints[i2]) {
             if (CurrentFrame.mvpMapPoints[i2]->Observations() > 0) {
               continue;
@@ -1837,11 +1779,7 @@ int ORBmatcher::SearchByProjection(
           int bestDist = 256;
           int bestIdx2 = -1;
 
-          for (std::vector<std::size_t>::const_iterator vit  = vIndices2.begin(),
-                                                        vend = vIndices2.end();
-               vit != vend;
-               vit++) {
-            const std::size_t i2 = *vit;
+          for (const std::size_t i2 : vIndices2) {
             if (CurrentFrame.mvpMapPoints[i2 + CurrentFrame.Nleft]) {
               if (CurrentFrame.mvpMapPoints[i2 + CurrentFrame.Nleft]->Observations() > 0) {
                 continue;
@@ -1896,8 +1834,8 @@ int ORBmatcher::SearchByProjection(
 
     for (int i = 0; i < HISTO_LENGTH; i++) {
       if (i != ind1 && i != ind2 && i != ind3) {
-        for (std::size_t j = 0, jend = rotHist[i].size(); j < jend; j++) {
-          CurrentFrame.mvpMapPoints[rotHist[i][j]] = static_cast<MapPoint*>(NULL);
+        for (const int bin : rotHist[i]) {
+          CurrentFrame.mvpMapPoints[bin] = static_cast<MapPoint*>(NULL);
           nmatches--;
         }
       }
@@ -1928,7 +1866,7 @@ int ORBmatcher::SearchByProjection(
 
   const std::vector<MapPoint*> vpMPs = pKF->GetMapPointMatches();
 
-  for (std::size_t i = 0, iend = vpMPs.size(); i < iend; i++) {
+  for (std::size_t i = 0; i < vpMPs.size(); i++) {
     MapPoint* pMP = vpMPs[i];
 
     if (pMP) {
@@ -1976,10 +1914,7 @@ int ORBmatcher::SearchByProjection(
         int bestDist = 256;
         int bestIdx2 = -1;
 
-        for (std::vector<std::size_t>::const_iterator vit = vIndices2.begin();
-             vit != vIndices2.end();
-             vit++) {
-          const std::size_t i2 = *vit;
+        for (const std::size_t i2 : vIndices2) {
           if (CurrentFrame.mvpMapPoints[i2]) {
             continue;
           }
@@ -2024,8 +1959,8 @@ int ORBmatcher::SearchByProjection(
 
     for (int i = 0; i < HISTO_LENGTH; i++) {
       if (i != ind1 && i != ind2 && i != ind3) {
-        for (std::size_t j = 0, jend = rotHist[i].size(); j < jend; j++) {
-          CurrentFrame.mvpMapPoints[rotHist[i][j]] = NULL;
+        for (const int bin : rotHist[i]) {
+          CurrentFrame.mvpMapPoints[bin] = NULL;
           nmatches--;
         }
       }
@@ -2079,9 +2014,9 @@ int ORBmatcher::DescriptorDistance(const cv::Mat& a, const cv::Mat& b) {
   int dist = 0;
 
   for (int i = 0; i < 8; i++, pa++, pb++) {
-    unsigned int v = *pa ^ *pb;
-    v              = v - ((v >> 1) & 0x55555555);
-    v              = (v & 0x33333333) + ((v >> 2) & 0x33333333);
+    unsigned int v  = *pa ^ *pb;
+    v               = v - ((v >> 1) & 0x55555555);
+    v               = (v & 0x33333333) + ((v >> 2) & 0x33333333);
     dist           += (((v + (v >> 4)) & 0xF0F0F0F) * 0x1010101) >> 24;
   }
 

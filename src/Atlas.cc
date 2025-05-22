@@ -18,6 +18,8 @@
  */
 
 #include "Atlas.h"
+#include <algorithm>
+#include <numeric>
 #include "KeyFrameDatabase.h"
 #include "LoggingUtils.h"
 #include "MapPoint.h"
@@ -36,18 +38,15 @@ Atlas::Atlas(int initKFid)
 }
 
 Atlas::~Atlas() {
-  for (std::set<Map*>::iterator it = mspMaps.begin(), end = mspMaps.end(); it != end;) {
-    Map* pMi = *it;
-
-    if (pMi) {
-      delete pMi;
-      pMi = static_cast<Map*>(NULL);
-
-      it = mspMaps.erase(it);
-    } else {
-      ++it;
+  // TODO(VuHoi): use nullptr
+  std::erase_if(mspMaps, [](Map* map) {
+    if (map) {
+      delete map;
+      map = static_cast<Map*>(NULL);
+      return true;
     }
-  }
+    return false;
+  });
 }
 
 void Atlas::CreateNewMap() {
@@ -107,6 +106,8 @@ GeometricCamera* Atlas::AddCamera(GeometricCamera* pCam) {
   // Check if the camera already exists
   bool bAlreadyInMap = false;
   int  index_cam     = -1;
+  // TODO(VuHoi): check pCam existing
+  // TODO(VuHoi): use std::views::enumerate in C++23
   for (std::size_t i = 0; i < mvpCameras.size(); ++i) {
     GeometricCamera* pCam_i = mvpCameras[i];
     if (!pCam) {
@@ -210,10 +211,9 @@ void Atlas::clearMap() {
 
 void Atlas::clearAtlas() {
   std::unique_lock<std::mutex> lock(mMutexAtlas);
-  /*for(std::set<Map*>::iterator it=mspMaps.begin(), send=mspMaps.end(); it!=send; it++)
-  {
-      (*it)->clear();
-      delete *it;
+  /*for (auto it=mspMaps.begin(), send=mspMaps.end(); it!=send; it++) {
+    (*it)->clear();
+    delete *it;
   }*/
   mspMaps.clear();
   mpCurrentMap      = static_cast<Map*>(NULL);
@@ -285,34 +285,35 @@ void Atlas::PreSave() {
   std::sort(mvpBackupMaps.begin(), mvpBackupMaps.end(), compFunctor());
 
   std::set<GeometricCamera*> spCams(mvpCameras.begin(), mvpCameras.end());
-  for (Map* pMi : mvpBackupMaps) {
-    if (!pMi || pMi->IsBad()) {
+  for (Map* const map : mvpBackupMaps) {
+    if (!map || map->IsBad()) {
       continue;
     }
 
-    if (pMi->GetAllKeyFrames().size() == 0) {
+    // TODO(VuHoi): check empty instead
+    if (map->GetAllKeyFrames().size() == 0) {
       // Empty map, erase before of save it.
-      SetMapBad(pMi);
+      SetMapBad(map);
       continue;
     }
-    pMi->PreSave(spCams);
+    map->PreSave(spCams);
   }
   RemoveBadMaps();
 }
 
 void Atlas::PostLoad() {
   std::map<unsigned int, GeometricCamera*> mpCams;
-  for (GeometricCamera* pCam : mvpCameras) {
-    mpCams[pCam->GetId()] = pCam;
+  for (GeometricCamera* const camera : mvpCameras) {
+    mpCams[camera->GetId()] = camera;
   }
 
   mspMaps.clear();
   unsigned long int numKF = 0, numMP = 0;
-  for (Map* pMi : mvpBackupMaps) {
-    mspMaps.insert(pMi);
-    pMi->PostLoad(mpKeyFrameDB, mpORBVocabulary, mpCams);
-    numKF += pMi->GetAllKeyFrames().size();
-    numMP += pMi->GetAllMapPoints().size();
+  for (Map* const map : mvpBackupMaps) {
+    mspMaps.insert(map);
+    map->PostLoad(mpKeyFrameDB, mpORBVocabulary, mpCams);
+    numKF += map->GetAllKeyFrames().size();
+    numMP += map->GetAllMapPoints().size();
   }
   mvpBackupMaps.clear();
 }
@@ -335,34 +336,45 @@ ORBVocabulary* Atlas::GetORBVocabulary() {
 
 long unsigned int Atlas::GetNumLivedKF() {
   std::unique_lock<std::mutex> lock(mMutexAtlas);
-  long unsigned int            num = 0;
-  for (Map* pMap_i : mspMaps) {
-    num += pMap_i->GetAllKeyFrames().size();
-  }
 
-  return num;
+  // Return the total number of keyframes across all maps in atlas.
+  return std::transform_reduce(
+    mspMaps.begin(),
+    mspMaps.end(),
+    0UL,
+    std::plus<>(),
+    [](Map* const map) {
+      return map->GetAllKeyFrames().size();
+    }
+  );
 }
 
 long unsigned int Atlas::GetNumLivedMP() {
   std::unique_lock<std::mutex> lock(mMutexAtlas);
-  long unsigned int            num = 0;
-  for (Map* pMap_i : mspMaps) {
-    num += pMap_i->GetAllMapPoints().size();
-  }
 
-  return num;
+  // Return the total number of mappoints across all maps in atlas.
+  return std::transform_reduce(
+    mspMaps.begin(),
+    mspMaps.end(),
+    0UL,
+    std::plus<>(),
+    [](Map* const map) {
+      return map->GetAllMapPoints().size();
+    }
+  );
 }
 
 std::map<long unsigned int, KeyFrame*> Atlas::GetAtlasKeyframes() {
   std::map<long unsigned int, KeyFrame*> mpIdKFs;
-  for (Map* pMap_i : mvpBackupMaps) {
-    std::vector<KeyFrame*> vpKFs_Mi = pMap_i->GetAllKeyFrames();
 
-    for (KeyFrame* pKF_j_Mi : vpKFs_Mi) {
-      mpIdKFs[pKF_j_Mi->mnId] = pKF_j_Mi;
+  // Construct a map of keyframe IDs and keyframes.
+  for (Map* const map : mvpBackupMaps) {
+    // TODO(VuHoi): add nullptr check for map.
+    for (KeyFrame* const kf : map->GetAllKeyFrames()) {
+      // TODO(VuHoi): add nullptr check for keyframe.
+      mpIdKFs[kf->mnId] = kf;
     }
   }
-
   return mpIdKFs;
 }
 

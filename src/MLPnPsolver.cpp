@@ -66,7 +66,7 @@ MLPnPsolver::MLPnPsolver(const Frame& F, const std::vector<MapPoint*>& vpMapPoin
   mvAllIndices.reserve(F.mvpMapPoints.size());
 
   int idx = 0;
-  for (std::size_t i = 0, iend = mvpMapPointMatches.size(); i < iend; i++) {
+  for (std::size_t i = 0; i < mvpMapPointMatches.size(); i++) {
     MapPoint* pMP = vpMapPointMatches[i];
 
     if (pMP) {
@@ -594,11 +594,10 @@ void MLPnPsolver::computePose(
       }
       normVal[i] = norms;
     }
-    std::vector<double>::iterator findMinRepro
-      = std::min_element(std::begin(normVal), std::end(normVal));
-    int idx = std::distance(std::begin(normVal), findMinRepro);
-    Rout    = Ts[idx].block<3, 3>(0, 0);
-    tout    = Ts[idx].block<3, 1>(0, 3);
+    auto findMinRepro = std::min_element(std::begin(normVal), std::end(normVal));
+    int  idx          = std::distance(std::begin(normVal), findMinRepro);
+    Rout              = Ts[idx].block<3, 3>(0, 0);
+    tout              = Ts[idx].block<3, 1>(0, 3);
   } else { // non-planar
     rotation_t tmp;
     tmp << result1(0, 0), result1(3, 0), result1(6, 0), result1(1, 0), result1(4, 0), result1(7, 0),

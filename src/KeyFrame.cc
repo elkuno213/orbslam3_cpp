@@ -18,8 +18,9 @@
  */
 
 #include "KeyFrame.h"
-#include <iostream>
+#include <algorithm>
 #include <list>
+#include <ranges>
 #include "Converter.h"
 #include "Frame.h"
 #include "GeometricCamera.h"
@@ -306,23 +307,21 @@ void KeyFrame::AddConnection(KeyFrame* pKF, const int& weight) {
 }
 
 void KeyFrame::UpdateBestCovisibles() {
-  std::unique_lock<std::mutex>           lock(mMutexConnections);
+  std::unique_lock<std::mutex> lock(mMutexConnections);
+
   std::vector<std::pair<int, KeyFrame*>> vPairs;
   vPairs.reserve(mConnectedKeyFrameWeights.size());
-  for (std::map<KeyFrame*, int>::iterator mit  = mConnectedKeyFrameWeights.begin(),
-                                          mend = mConnectedKeyFrameWeights.end();
-       mit != mend;
-       mit++) {
-    vPairs.push_back(make_pair(mit->second, mit->first));
+  for (const auto& [kf, weight] : mConnectedKeyFrameWeights) {
+    vPairs.push_back(std::make_pair(weight, kf));
   }
-
   std::sort(vPairs.begin(), vPairs.end());
+
   std::list<KeyFrame*> lKFs;
   std::list<int>       lWs;
-  for (std::size_t i = 0, iend = vPairs.size(); i < iend; i++) {
-    if (!vPairs[i].second->isBad()) {
-      lKFs.push_front(vPairs[i].second);
-      lWs.push_front(vPairs[i].first);
+  for (const auto& [weight, kf] : vPairs) {
+    if (!kf->isBad()) {
+      lKFs.push_front(kf);
+      lWs.push_front(weight);
     }
   }
 
@@ -333,11 +332,10 @@ void KeyFrame::UpdateBestCovisibles() {
 std::set<KeyFrame*> KeyFrame::GetConnectedKeyFrames() {
   std::unique_lock<std::mutex> lock(mMutexConnections);
   std::set<KeyFrame*>          s;
-  for (std::map<KeyFrame*, int>::iterator mit = mConnectedKeyFrameWeights.begin();
-       mit != mConnectedKeyFrameWeights.end();
-       mit++) {
-    s.insert(mit->first);
-  }
+  std::ranges::copy(
+    mConnectedKeyFrameWeights | std::views::keys, // view keys only
+    std::inserter(s, s.begin())
+  );
   return s;
 }
 
@@ -365,8 +363,7 @@ std::vector<KeyFrame*> KeyFrame::GetCovisiblesByWeight(const int& w) {
     return std::vector<KeyFrame*>();
   }
 
-  std::vector<int>::iterator it
-    = upper_bound(mvOrderedWeights.begin(), mvOrderedWeights.end(), w, KeyFrame::weightComp);
+  auto it = std::ranges::upper_bound(mvOrderedWeights, w, KeyFrame::weightComp);
 
   if (it == mvOrderedWeights.end() && mvOrderedWeights.back() < w) {
     return std::vector<KeyFrame*>();
@@ -390,14 +387,10 @@ int KeyFrame::GetWeight(KeyFrame* pKF) {
 
 int KeyFrame::GetNumberMPs() {
   std::unique_lock<std::mutex> lock(mMutexFeatures);
-  int                          numberMPs = 0;
-  for (std::size_t i = 0, iend = mvpMapPoints.size(); i < iend; i++) {
-    if (!mvpMapPoints[i]) {
-      continue;
-    }
-    numberMPs++;
-  }
-  return numberMPs;
+  // Return the total number of non-null mappoints in the keyframe.
+  return std::ranges::count_if(mvpMapPoints, [](const MapPoint* const mp) {
+    return mp != nullptr;
+  });
 }
 
 void KeyFrame::AddMapPoint(MapPoint* pMP, const std::size_t& idx) {
@@ -427,16 +420,11 @@ void KeyFrame::ReplaceMapPointMatch(const int& idx, MapPoint* pMP) {
 
 std::set<MapPoint*> KeyFrame::GetMapPoints() {
   std::unique_lock<std::mutex> lock(mMutexFeatures);
-  std::set<MapPoint*>          s;
-  for (std::size_t i = 0, iend = mvpMapPoints.size(); i < iend; i++) {
-    if (!mvpMapPoints[i]) {
-      continue;
-    }
-    MapPoint* pMP = mvpMapPoints[i];
-    if (!pMP->isBad()) {
-      s.insert(pMP);
-    }
-  }
+  // Return a set of non-null and non-bad mappoints.
+  std::set<MapPoint*> s;
+  std::ranges::copy_if(mvpMapPoints, std::inserter(s, s.begin()), [](MapPoint* const mp) {
+    return mp && !mp->isBad();
+  });
   return s;
 }
 
@@ -485,27 +473,20 @@ void KeyFrame::UpdateConnections(bool upParent) {
 
   // For all map points in keyframe check in which other keyframes are they seen
   // Increase counter for those keyframes
-  for (std::vector<MapPoint*>::iterator vit = vpMP.begin(), vend = vpMP.end(); vit != vend; vit++) {
-    MapPoint* pMP = *vit;
-
-    if (!pMP) {
+  for (MapPoint* const mp : vpMP) {
+    if (!mp) {
       continue;
     }
 
-    if (pMP->isBad()) {
+    if (mp->isBad()) {
       continue;
     }
 
-    std::map<KeyFrame*, std::tuple<int, int>> observations = pMP->GetObservations();
-
-    for (std::map<KeyFrame*, std::tuple<int, int>>::iterator mit  = observations.begin(),
-                                                             mend = observations.end();
-         mit != mend;
-         mit++) {
-      if (mit->first->mnId == mnId || mit->first->isBad() || mit->first->GetMap() != mpMap) {
+    for (const auto& [kf, _] : mp->GetObservations()) {
+      if (kf->mnId == mnId || kf->isBad() || kf->GetMap() != mpMap) {
         continue;
       }
-      KFcounter[mit->first]++;
+      KFcounter[kf]++;
     }
   }
 
@@ -525,23 +506,18 @@ void KeyFrame::UpdateConnections(bool upParent) {
   if (!upParent) {
     _logger->debug("UpdateConnections: current key frame {}", mnId);
   }
-  for (std::map<KeyFrame*, int>::iterator mit = KFcounter.begin(), mend = KFcounter.end();
-       mit != mend;
-       mit++) {
+  for (const auto& [kf, num_matches] : KFcounter) {
     if (!upParent) {
-      _logger->debug(
-        "UpdateConnections: candidate key frame {} has {} matches",
-        mit->first->mnId,
-        mit->second
-      );
+      _logger
+        ->debug("UpdateConnections: candidate keyframe {} has {} matches", kf->mnId, num_matches);
     }
-    if (mit->second > nmax) {
-      nmax   = mit->second;
-      pKFmax = mit->first;
+    if (num_matches > nmax) {
+      nmax   = num_matches;
+      pKFmax = kf;
     }
-    if (mit->second >= th) {
-      vPairs.push_back(make_pair(mit->second, mit->first));
-      (mit->first)->AddConnection(this, mit->second);
+    if (num_matches >= th) {
+      vPairs.push_back(std::make_pair(num_matches, kf));
+      kf->AddConnection(this, num_matches);
     }
   }
 
@@ -553,9 +529,9 @@ void KeyFrame::UpdateConnections(bool upParent) {
   std::sort(vPairs.begin(), vPairs.end());
   std::list<KeyFrame*> lKFs;
   std::list<int>       lWs;
-  for (std::size_t i = 0; i < vPairs.size(); i++) {
-    lKFs.push_front(vPairs[i].second);
-    lWs.push_front(vPairs[i].first);
+  for (const auto& [weight, kf] : vPairs) {
+    lKFs.push_front(kf);
+    lWs.push_front(weight);
   }
 
   {
@@ -665,18 +641,18 @@ void KeyFrame::SetBadFlag() {
     }
   }
 
-  for (std::map<KeyFrame*, int>::iterator mit  = mConnectedKeyFrameWeights.begin(),
-                                          mend = mConnectedKeyFrameWeights.end();
-       mit != mend;
-       mit++) {
-    mit->first->EraseConnection(this);
-  }
+  std::ranges::for_each(mConnectedKeyFrameWeights | std::views::keys, [this](KeyFrame* const kf) {
+    kf->EraseConnection(this);
+  });
 
-  for (std::size_t i = 0; i < mvpMapPoints.size(); i++) {
-    if (mvpMapPoints[i]) {
-      mvpMapPoints[i]->EraseObservation(this);
+  std::ranges::for_each(
+    mvpMapPoints | std::views::filter([](MapPoint* const mp) {
+      return mp != nullptr;
+    }),
+    [this](MapPoint* const mp) {
+      mp->EraseObservation(this);
     }
-  }
+  );
 
   {
     std::unique_lock<std::mutex> lock(mMutexConnections);
@@ -700,26 +676,19 @@ void KeyFrame::SetBadFlag() {
       KeyFrame* pC;
       KeyFrame* pP;
 
-      for (std::set<KeyFrame*>::iterator sit = mspChildrens.begin(), send = mspChildrens.end();
-           sit != send;
-           sit++) {
-        KeyFrame* pKF = *sit;
-        if (pKF->isBad()) {
+      for (KeyFrame* const child : mspChildrens) {
+        if (child->isBad()) {
           continue;
         }
 
         // Check if a parent candidate is connected to the keyframe
-        std::vector<KeyFrame*> vpConnected = pKF->GetVectorCovisibleKeyFrames();
-        for (std::size_t i = 0, iend = vpConnected.size(); i < iend; i++) {
-          for (std::set<KeyFrame*>::iterator spcit  = sParentCandidates.begin(),
-                                             spcend = sParentCandidates.end();
-               spcit != spcend;
-               spcit++) {
-            if (vpConnected[i]->mnId == (*spcit)->mnId) {
-              int w = pKF->GetWeight(vpConnected[i]);
+        for (KeyFrame* const neighbor : child->GetVectorCovisibleKeyFrames()) {
+          for (KeyFrame* const parent : sParentCandidates) {
+            if (neighbor->mnId == parent->mnId) {
+              int w = child->GetWeight(neighbor);
               if (w > max) {
-                pC        = pKF;
-                pP        = vpConnected[i];
+                pC        = child;
+                pP        = neighbor;
                 max       = w;
                 bContinue = true;
               }
@@ -740,10 +709,9 @@ void KeyFrame::SetBadFlag() {
     // If a children has no covisibility links with any parent candidate, assign to the original
     // parent of this KF
     if (!mspChildrens.empty()) {
-      for (std::set<KeyFrame*>::iterator sit = mspChildrens.begin(); sit != mspChildrens.end();
-           sit++) {
-        (*sit)->ChangeParent(mpParent);
-      }
+      std::ranges::for_each(mspChildrens, [this](KeyFrame* const child) {
+        child->ChangeParent(mpParent);
+      });
     }
 
     if (mpParent) {
@@ -815,15 +783,15 @@ std::vector<std::size_t> KeyFrame::GetFeaturesInArea(
   for (int ix = nMinCellX; ix <= nMaxCellX; ix++) {
     for (int iy = nMinCellY; iy <= nMaxCellY; iy++) {
       const std::vector<std::size_t> vCell = (!bRight) ? mGrid[ix][iy] : mGridRight[ix][iy];
-      for (std::size_t j = 0, jend = vCell.size(); j < jend; j++) {
-        const cv::KeyPoint& kpUn  = (NLeft == -1) ? mvKeysUn[vCell[j]]
-                                  : (!bRight)     ? mvKeys[vCell[j]]
-                                                  : mvKeysRight[vCell[j]];
+      for (const std::size_t id : vCell) {
+        const cv::KeyPoint& kpUn  = (NLeft == -1) ? mvKeysUn[id]
+                                  : (!bRight)     ? mvKeys[id]
+                                                  : mvKeysRight[id];
         const float         distx = kpUn.pt.x - x;
         const float         disty = kpUn.pt.y - y;
 
         if (std::fabs(distx) < r && std::fabs(disty) < r) {
-          vIndices.push_back(vCell[j]);
+          vIndices.push_back(id);
         }
       }
     }
@@ -936,12 +904,9 @@ void KeyFrame::PreSave(
   }
   // Save the id of each connected KF with it weight
   mBackupConnectedKeyFrameIdWeights.clear();
-  for (std::map<KeyFrame*, int>::const_iterator it  = mConnectedKeyFrameWeights.begin(),
-                                                end = mConnectedKeyFrameWeights.end();
-       it != end;
-       ++it) {
-    if (spKF.find(it->first) != spKF.end()) {
-      mBackupConnectedKeyFrameIdWeights[it->first->mnId] = it->second;
+  for (const auto& [kf, weight] : mConnectedKeyFrameWeights) {
+    if (spKF.find(kf) != spKF.end()) {
+      mBackupConnectedKeyFrameIdWeights[kf->mnId] = weight;
     }
   }
 
@@ -954,27 +919,27 @@ void KeyFrame::PreSave(
   // Save the id of the childrens KF
   mvBackupChildrensId.clear();
   mvBackupChildrensId.reserve(mspChildrens.size());
-  for (KeyFrame* pKFi : mspChildrens) {
-    if (spKF.find(pKFi) != spKF.end()) {
-      mvBackupChildrensId.push_back(pKFi->mnId);
+  for (KeyFrame* const kf : mspChildrens) {
+    if (spKF.find(kf) != spKF.end()) {
+      mvBackupChildrensId.push_back(kf->mnId);
     }
   }
 
   // Save the id of the loop edge KF
   mvBackupLoopEdgesId.clear();
   mvBackupLoopEdgesId.reserve(mspLoopEdges.size());
-  for (KeyFrame* pKFi : mspLoopEdges) {
-    if (spKF.find(pKFi) != spKF.end()) {
-      mvBackupLoopEdgesId.push_back(pKFi->mnId);
+  for (KeyFrame* const kf : mspLoopEdges) {
+    if (spKF.find(kf) != spKF.end()) {
+      mvBackupLoopEdgesId.push_back(kf->mnId);
     }
   }
 
   // Save the id of the merge edge KF
   mvBackupMergeEdgesId.clear();
   mvBackupMergeEdgesId.reserve(mspMergeEdges.size());
-  for (KeyFrame* pKFi : mspMergeEdges) {
-    if (spKF.find(pKFi) != spKF.end()) {
-      mvBackupMergeEdgesId.push_back(pKFi->mnId);
+  for (KeyFrame* const kf : mspMergeEdges) {
+    if (spKF.find(kf) != spKF.end()) {
+      mvBackupMergeEdgesId.push_back(kf->mnId);
     }
   }
 
@@ -1031,13 +996,9 @@ void KeyFrame::PostLoad(
 
   // Conected KeyFrames with him weight
   mConnectedKeyFrameWeights.clear();
-  for (std::map<long unsigned int, int>::const_iterator it
-       = mBackupConnectedKeyFrameIdWeights.begin(),
-       end = mBackupConnectedKeyFrameIdWeights.end();
-       it != end;
-       ++it) {
-    KeyFrame* pKFi                  = mpKFid[it->first];
-    mConnectedKeyFrameWeights[pKFi] = it->second;
+  for (const auto& [id, weight] : mBackupConnectedKeyFrameIdWeights) {
+    KeyFrame* pKFi                  = mpKFid[id];
+    mConnectedKeyFrameWeights[pKFi] = weight;
   }
 
   // Restore parent KeyFrame
@@ -1047,29 +1008,20 @@ void KeyFrame::PostLoad(
 
   // KeyFrame childrens
   mspChildrens.clear();
-  for (std::vector<long unsigned int>::const_iterator it  = mvBackupChildrensId.begin(),
-                                                      end = mvBackupChildrensId.end();
-       it != end;
-       ++it) {
-    mspChildrens.insert(mpKFid[*it]);
+  for (const unsigned long id : mvBackupChildrensId) {
+    mspChildrens.insert(mpKFid[id]);
   }
 
   // Loop edge KeyFrame
   mspLoopEdges.clear();
-  for (std::vector<long unsigned int>::const_iterator it  = mvBackupLoopEdgesId.begin(),
-                                                      end = mvBackupLoopEdgesId.end();
-       it != end;
-       ++it) {
-    mspLoopEdges.insert(mpKFid[*it]);
+  for (const unsigned long id : mvBackupLoopEdgesId) {
+    mspLoopEdges.insert(mpKFid[id]);
   }
 
   // Merge edge KeyFrame
   mspMergeEdges.clear();
-  for (std::vector<long unsigned int>::const_iterator it  = mvBackupMergeEdgesId.begin(),
-                                                      end = mvBackupMergeEdgesId.end();
-       it != end;
-       ++it) {
-    mspMergeEdges.insert(mpKFid[*it]);
+  for (const unsigned long id : mvBackupMergeEdgesId) {
+    mspMergeEdges.insert(mpKFid[id]);
   }
 
   // Camera data

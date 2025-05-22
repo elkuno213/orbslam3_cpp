@@ -276,16 +276,13 @@ void MapPoint::SetBadFlag() {
     obs   = mObservations;
     mObservations.clear();
   }
-  for (std::map<KeyFrame*, std::tuple<int, int>>::iterator mit = obs.begin(), mend = obs.end();
-       mit != mend;
-       mit++) {
-    KeyFrame* pKF       = mit->first;
-    int       leftIndex = std::get<0>(mit->second), rightIndex = std::get<1>(mit->second);
-    if (leftIndex != -1) {
-      pKF->EraseMapPointMatch(leftIndex);
+  for (const auto& [kf, indices] : obs) {
+    const auto [left_id, right_id] = indices;
+    if (left_id != -1) {
+      kf->EraseMapPointMatch(left_id);
     }
-    if (rightIndex != -1) {
-      pKF->EraseMapPointMatch(rightIndex);
+    if (right_id != -1) {
+      kf->EraseMapPointMatch(right_id);
     }
   }
 
@@ -316,30 +313,24 @@ void MapPoint::Replace(MapPoint* pMP) {
     mpReplaced = pMP;
   }
 
-  for (std::map<KeyFrame*, std::tuple<int, int>>::iterator mit = obs.begin(), mend = obs.end();
-       mit != mend;
-       mit++) {
-    // Replace measurement in keyframe
-    KeyFrame* pKF = mit->first;
+  for (const auto& [kf, indices] : obs) {
+    const auto [left_id, right_id] = indices;
 
-    std::tuple<int, int> indexes   = mit->second;
-    int                  leftIndex = std::get<0>(indexes), rightIndex = std::get<1>(indexes);
-
-    if (!pMP->IsInKeyFrame(pKF)) {
-      if (leftIndex != -1) {
-        pKF->ReplaceMapPointMatch(leftIndex, pMP);
-        pMP->AddObservation(pKF, leftIndex);
+    if (!pMP->IsInKeyFrame(kf)) {
+      if (left_id != -1) {
+        kf->ReplaceMapPointMatch(left_id, pMP);
+        pMP->AddObservation(kf, left_id);
       }
-      if (rightIndex != -1) {
-        pKF->ReplaceMapPointMatch(rightIndex, pMP);
-        pMP->AddObservation(pKF, rightIndex);
+      if (right_id != -1) {
+        kf->ReplaceMapPointMatch(right_id, pMP);
+        pMP->AddObservation(kf, right_id);
       }
     } else {
-      if (leftIndex != -1) {
-        pKF->EraseMapPointMatch(leftIndex);
+      if (left_id != -1) {
+        kf->EraseMapPointMatch(left_id);
       }
-      if (rightIndex != -1) {
-        pKF->EraseMapPointMatch(rightIndex);
+      if (right_id != -1) {
+        kf->EraseMapPointMatch(right_id);
       }
     }
   }
@@ -393,21 +384,14 @@ void MapPoint::ComputeDistinctiveDescriptors() {
 
   vDescriptors.reserve(observations.size());
 
-  for (std::map<KeyFrame*, std::tuple<int, int>>::iterator mit  = observations.begin(),
-                                                           mend = observations.end();
-       mit != mend;
-       mit++) {
-    KeyFrame* pKF = mit->first;
-
-    if (!pKF->isBad()) {
-      std::tuple<int, int> indexes   = mit->second;
-      int                  leftIndex = std::get<0>(indexes), rightIndex = std::get<1>(indexes);
-
-      if (leftIndex != -1) {
-        vDescriptors.push_back(pKF->mDescriptors.row(leftIndex));
+  for (const auto& [kf, indices] : observations) {
+    if (!kf->isBad()) {
+      const auto [left_id, right_id] = indices;
+      if (left_id != -1) {
+        vDescriptors.push_back(kf->mDescriptors.row(left_id));
       }
-      if (rightIndex != -1) {
-        vDescriptors.push_back(pKF->mDescriptors.row(rightIndex));
+      if (right_id != -1) {
+        vDescriptors.push_back(kf->mDescriptors.row(right_id));
       }
     }
   }
@@ -490,23 +474,17 @@ void MapPoint::UpdateNormalAndDepth() {
   Eigen::Vector3f normal;
   normal.setZero();
   int n = 0;
-  for (std::map<KeyFrame*, std::tuple<int, int>>::iterator mit  = observations.begin(),
-                                                           mend = observations.end();
-       mit != mend;
-       mit++) {
-    KeyFrame* pKF = mit->first;
+  for (const auto& [kf, indices] : observations) {
+    const auto [left_id, right_id] = indices;
 
-    std::tuple<int, int> indexes   = mit->second;
-    int                  leftIndex = std::get<0>(indexes), rightIndex = std::get<1>(indexes);
-
-    if (leftIndex != -1) {
-      Eigen::Vector3f Owi     = pKF->GetCameraCenter();
+    if (left_id != -1) {
+      Eigen::Vector3f Owi     = kf->GetCameraCenter();
       Eigen::Vector3f normali = Pos - Owi;
       normal                  = normal + normali / normali.norm();
       n++;
     }
-    if (rightIndex != -1) {
-      Eigen::Vector3f Owi     = pKF->GetRightCameraCenter();
+    if (right_id != -1) {
+      Eigen::Vector3f Owi     = kf->GetRightCameraCenter();
       Eigen::Vector3f normali = Pos - Owi;
       normal                  = normal + normali / normali.norm();
       n++;
@@ -607,16 +585,13 @@ void MapPoint::PreSave(set<KeyFrame*>& spKF, set<MapPoint*>& spMP) {
   mBackupObservationsId1.clear();
   mBackupObservationsId2.clear();
   // Save the id and position in each KF who view it
-  for (std::map<KeyFrame*, std::tuple<int, int>>::const_iterator it  = mObservations.begin(),
-                                                                 end = mObservations.end();
-       it != end;
-       ++it) {
-    KeyFrame* pKFi = it->first;
-    if (spKF.find(pKFi) != spKF.end()) {
-      mBackupObservationsId1[it->first->mnId] = std::get<0>(it->second);
-      mBackupObservationsId2[it->first->mnId] = std::get<1>(it->second);
+  for (const auto& [kf, indices] : mObservations) {
+    const auto [left_id, right_id] = indices;
+    if (spKF.find(kf) != spKF.end()) {
+      mBackupObservationsId1[kf->mnId] = left_id;
+      mBackupObservationsId2[kf->mnId] = right_id;
     } else {
-      EraseObservation(pKFi);
+      EraseObservation(kf);
     }
   }
 
@@ -635,7 +610,7 @@ void MapPoint::PostLoad(
   }
   mpReplaced = static_cast<MapPoint*>(NULL);
   if (mBackupReplacedId >= 0) {
-    std::map<long unsigned int, MapPoint*>::iterator it = mpMPid.find(mBackupReplacedId);
+    auto it = mpMPid.find(mBackupReplacedId);
     if (it != mpMPid.end()) {
       mpReplaced = it->second;
     }
@@ -643,13 +618,10 @@ void MapPoint::PostLoad(
 
   mObservations.clear();
 
-  for (std::map<long unsigned int, int>::const_iterator it  = mBackupObservationsId1.begin(),
-                                                        end = mBackupObservationsId1.end();
-       it != end;
-       ++it) {
-    KeyFrame*                                        pKFi = mpKFid[it->first];
-    std::map<long unsigned int, int>::const_iterator it2  = mBackupObservationsId2.find(it->first);
-    std::tuple<int, int> indexes = std::tuple<int, int>(it->second, it2->second);
+  for (const auto& [kf_id, left_id] : mBackupObservationsId1) {
+    KeyFrame*            pKFi    = mpKFid[kf_id];
+    auto                 it2     = mBackupObservationsId2.find(kf_id);
+    std::tuple<int, int> indexes = std::tuple<int, int>(left_id, it2->second);
     if (pKFi) {
       mObservations[pKFi] = indexes;
     }

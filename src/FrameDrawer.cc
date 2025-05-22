@@ -116,22 +116,14 @@ cv::Mat FrameDrawer::DrawFrame(float imageScale) {
         cv::line(im, pt1, pt2, standardColor);
       }
     }
-    for (std::vector<std::pair<cv::Point2f, cv::Point2f> >::iterator it = vTracks.begin();
-         it != vTracks.end();
-         it++) {
-      cv::Point2f pt1, pt2;
+    for (auto [pt1, pt2] : vTracks) {
       if (imageScale != 1.f) {
-        pt1 = (*it).first / imageScale;
-        pt2 = (*it).second / imageScale;
-      } else {
-        pt1 = (*it).first;
-        pt2 = (*it).second;
+        pt1 /= imageScale;
+        pt2 /= imageScale;
       }
       cv::line(im, pt1, pt2, standardColor, 5);
     }
-
-  } else if (state == Tracking::OK) // TRACKING
-  {
+  } else if (state == Tracking::OK) { // Tracking
     mnTracked     = 0;
     mnTrackedVO   = 0;
     const float r = 5;
@@ -161,8 +153,7 @@ cv::Mat FrameDrawer::DrawFrame(float imageScale) {
           cv::rectangle(im, pt1, pt2, standardColor);
           cv::circle(im, point, 2, standardColor, -1);
           mnTracked++;
-        } else // This is match to a "visual odometry" MapPoint created in the last frame
-        {
+        } else { // This is match to a "visual odometry" MapPoint created in the last frame
           cv::rectangle(im, pt1, pt2, odometryColor);
           cv::circle(im, point, 2, odometryColor, -1);
           mnTrackedVO++;

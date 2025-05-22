@@ -161,7 +161,7 @@ void ImuCamPose::SetParam(
   Rcb.resize(num_cams);
   tcb.resize(num_cams);
 
-  for (int i = 0; i < tcb.size(); i++) {
+  for (std::size_t i = 0; i < tcb.size(); i++) {
     Rcb[i] = Rbc[i].transpose();
     tcb[i] = -Rcb[i] * tbc[i];
   }
@@ -210,7 +210,7 @@ void ImuCamPose::Update(const double* pu) {
   const Eigen::Matrix3d Rbw = Rwb.transpose();
   const Eigen::Vector3d tbw = -Rbw * twb;
 
-  for (int i = 0; i < pCamera.size(); i++) {
+  for (std::size_t i = 0; i < pCamera.size(); i++) {
     Rcw[i] = Rcb[i] * Rbw;
     tcw[i] = Rcb[i] * tbw + tcb[i];
   }
@@ -242,7 +242,7 @@ void ImuCamPose::UpdateW(const double* pu) {
   const Eigen::Matrix3d Rbw = Rwb.transpose();
   const Eigen::Vector3d tbw = -Rbw * twb;
 
-  for (int i = 0; i < pCamera.size(); i++) {
+  for (std::size_t i = 0; i < pCamera.size(); i++) {
     Rcw[i] = Rcb[i] * Rbw;
     tcw[i] = Rcb[i] * tbw + tcb[i];
   }
@@ -269,8 +269,8 @@ bool VertexPose::read(std::istream& is) {
   std::vector<Eigen::Matrix<double, 3, 3> > Rbc;
   std::vector<Eigen::Matrix<double, 3, 1> > tbc;
 
-  const int num_cams = _estimate.Rbc.size();
-  for (int idx = 0; idx < num_cams; idx++) {
+  const std::size_t num_cams = _estimate.Rbc.size();
+  for (std::size_t idx = 0; idx < num_cams; idx++) {
     for (int i = 0; i < 3; i++) {
       for (int j = 0; j < 3; j++) {
         is >> Rcw[idx](i, j);
@@ -290,7 +290,7 @@ bool VertexPose::read(std::istream& is) {
     }
 
     float nextParam;
-    for (size_t i = 0; i < _estimate.pCamera[idx]->size(); i++) {
+    for (std::size_t i = 0; i < _estimate.pCamera[idx]->size(); i++) {
       is >> nextParam;
       _estimate.pCamera[idx]->setParameter(nextParam, i);
     }
@@ -311,9 +311,8 @@ bool VertexPose::write(std::ostream& os) const {
   std::vector<Eigen::Matrix<double, 3, 3> > Rbc = _estimate.Rbc;
   std::vector<Eigen::Matrix<double, 3, 1> > tbc = _estimate.tbc;
 
-  const int num_cams = tcw.size();
-
-  for (int idx = 0; idx < num_cams; idx++) {
+  const std::size_t num_cams = tcw.size();
+  for (std::size_t idx = 0; idx < num_cams; idx++) {
     for (int i = 0; i < 3; i++) {
       for (int j = 0; j < 3; j++) {
         os << Rcw[idx](i, j) << " ";
@@ -332,7 +331,7 @@ bool VertexPose::write(std::ostream& os) const {
       os << tbc[idx](i) << " ";
     }
 
-    for (size_t i = 0; i < _estimate.pCamera[idx]->size(); i++) {
+    for (std::size_t i = 0; i < _estimate.pCamera[idx]->size(); i++) {
       os << _estimate.pCamera[idx]->getParameter(i) << " ";
     }
   }

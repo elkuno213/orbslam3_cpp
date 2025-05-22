@@ -226,12 +226,12 @@ bool VertexSim3Expmap::read(std::istream& is) {
   is >> cam2world[6];
 
   float nextParam;
-  for (size_t i = 0; i < pCamera1->size(); i++) {
+  for (std::size_t i = 0; i < pCamera1->size(); i++) {
     is >> nextParam;
     pCamera1->setParameter(nextParam, i);
   }
 
-  for (size_t i = 0; i < pCamera2->size(); i++) {
+  for (std::size_t i = 0; i < pCamera2->size(); i++) {
     is >> nextParam;
     pCamera2->setParameter(nextParam, i);
   }
@@ -247,11 +247,11 @@ bool VertexSim3Expmap::write(std::ostream& os) const {
     os << lv[i] << " ";
   }
 
-  for (size_t i = 0; i < pCamera1->size(); i++) {
+  for (std::size_t i = 0; i < pCamera1->size(); i++) {
     os << pCamera1->getParameter(i) << " ";
   }
 
-  for (size_t i = 0; i < pCamera2->size(); i++) {
+  for (std::size_t i = 0; i < pCamera2->size(); i++) {
     os << pCamera2->getParameter(i) << " ";
   }
 
